@@ -1,0 +1,181 @@
+const Article = require('../models/Article');
+const logger = require('../utils/logger');
+
+// Create a new article (CRUD: Create)
+exports.createArticle = async (req, res) => {
+    try {
+        const { title, reporter, category, mainImage, content } = req.body;
+
+        // Create a new Article instance
+        const newArticle = new Article({
+            title: title,
+            reporter: reporter,
+            category: category,
+            mainImage: mainImage,
+            content: content,
+            status: 'Draft' // New articles always start as draft
+        });
+
+        // Save the article to the database
+        const savedArticle = await newArticle.save();
+
+        res.status(201).json({
+            message: 'Article created successfully as a draft',
+            article: savedArticle
+        });
+
+    } catch (error) {
+        // Record the error in the logs/errors.log file
+        logger.logError('Error creating article', error);
+
+        res.status(500).json({ 
+            message: 'Error creating article', 
+            error: error.message 
+        });
+    }
+};
+
+// Get all articles (CRUD: Read)
+exports.getArticles = async (req, res) => {
+    try {
+        // Fetch all articles from the database
+        const articles = await Article.find();
+
+        // Send successful response with the articles array
+        res.status(200).json({
+            message: 'Articles fetched successfully',
+            count: articles.length,
+            articles: articles
+        });
+    } catch (error) {
+        logger.logError('Error fetching articles', error);
+
+        // Handle errors without crashing the server
+        res.status(500).json({ 
+            message: 'Error fetching articles', 
+            error: error.message 
+        });
+    }
+};
+
+// Update an existing article (CRUD: Update)
+exports.updateArticle = async (req, res) => {
+    try {
+        // Extract the article ID from the URL parameters
+        const articleId = req.params.id;
+        const updateData = req.body;
+
+        // Find the article by ID and update it with the new data
+        const updatedArticle = await Article.findByIdAndUpdate(
+            articleId,
+            updateData,
+            { new: true, runValidators: true }
+        );
+
+        // If no article matches the given ID
+        if (!updatedArticle) {
+            return res.status(404).json({ message: 'Article not found' });
+        }
+
+        res.status(200).json({
+            message: 'Article updated successfully',
+            article: updatedArticle
+        });
+    } catch (error) {
+        logger.logError('Error updating article', error);
+
+        res.status(500).json({ 
+            message: 'Error updating article', 
+            error: error.message 
+        });
+    }
+};
+
+// Delete an article (CRUD: Delete)
+exports.deleteArticle = async (req, res) => {
+    try {
+        // Extract the article ID from the URL parameters
+        const articleId = req.params.id;
+
+        // Find the article by ID and delete it from the database
+        const deletedArticle = await Article.findByIdAndDelete(articleId);
+
+        // If no article matches the given ID
+        if (!deletedArticle) {
+            return res.status(404).json({ message: 'Article not found' });
+        }
+
+        res.status(200).json({
+            message: 'Article deleted successfully',
+            deletedArticleId: deletedArticle._id
+        });
+    } catch (error) {
+        logger.logError('Error deleting article', error);
+
+        res.status(500).json({ 
+            message: 'Error deleting article', 
+            error: error.message 
+        });
+    }
+};
+
+// Approve and publish an article (Editor action)
+exports.publishArticle = async (req, res) => {
+    try {
+        const articleId = req.params.id;
+        const article = await Article.findById(articleId);
+
+        if (!article) {
+            return res.status(404).json({ message: 'Article not found' });
+        }
+
+        // Copy the current working draft into the publishedVersion object
+        article.publishedVersion = {
+            title: article.title,
+            category: article.category,
+            mainImage: article.mainImage,
+            content: article.content,
+            publishedAt: new Date()
+        };
+        
+        // Update the status to 'Published'
+        article.status = 'Published';
+        
+        const savedArticle = await article.save();
+
+        res.status(200).json({
+            message: 'Article published successfully',
+            article: savedArticle
+        });
+    } catch (error) {
+        logger.logError('Error publishing article', error);
+
+        res.status(500).json({ 
+            message: 'Error publishing article', 
+            error: error.message 
+        });
+    }
+};
+
+// Get only published articles for the public homepage (Guests)
+exports.getPublicArticles = async (req, res) => {
+    try {
+        // Find only articles with 'Published' status
+        const articles = await Article.find({ status: 'Published' })
+            // Sort by the actual publish date, newest first
+            .sort({ 'publishedVersion.publishedAt': -1 }); 
+
+        res.status(200).json({
+            message: 'Public articles fetched successfully',
+            count: articles.length,
+            articles: articles
+        });
+    } catch (error) {
+        logger.logError('Error fetching public articles', error);
+        
+        res.status(500).json({ 
+            message: 'Error fetching public articles', 
+            error: error.message 
+        });
+    }
+};
