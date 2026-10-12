@@ -21,4 +21,25 @@ router.put('/publish/:id', authMiddleware.verifyToken, authMiddleware.requireEdi
 // Route to handle DELETE requests for removing an article by ID (Protected: Editor only)
 router.delete('/delete/:id', authMiddleware.verifyToken, authMiddleware.requireEditor, articleController.deleteArticle);
 
+// Route to get a single article page rendered in EJS (Public)
+router.get('/view/:id', async (req, res) => {
+    try {
+        // שליפת המודל הקיים מתוך Mongoose ישירות בלי טעינה כפולה של הקובץ
+        const mongoose = require('mongoose');
+        const Article = mongoose.model('Article');
+        
+        const article = await Article.findById(req.params.id);
+        
+        if (!article) {
+            return res.status(404).send('הכתבה לא נמצאה');
+        }
+        
+        // רינדור קובץ ה-EJS שיצרנו בתיקיית views והעברת הנתונים
+        res.render('article', { article });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('שגיאת שרת');
+    }
+});
+
 module.exports = router;

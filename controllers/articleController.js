@@ -157,17 +157,29 @@ exports.publishArticle = async (req, res) => {
     }
 };
 
-// Get only published articles for the public homepage (Guests)
+// Get only published articles for the public homepage (Guests) with Pagination
 exports.getPublicArticles = async (req, res) => {
     try {
-        // Find only articles with 'Published' status
+        // קליטת מספר העמוד והכמות מתוך ה-Query Parameters (ברירת מחדל: עמוד 1, 5 כתבות בעמוד)
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 5;
+        const skip = (page - 1) * limit;
+
+        // שליפת הכתבות המפורסמות עם מדלג (skip) ומגבלה (limit)
         const articles = await Article.find({ status: 'Published' })
-            // Sort by the actual publish date, newest first
-            .sort({ 'publishedVersion.publishedAt': -1 }); 
+            .sort({ 'publishedVersion.publishedAt': -1 }) // מהחדש ישן
+            .skip(skip)
+            .limit(limit);
+
+        // ספירת סך הכל הכתבות המפורסמות לצורך בקרה
+        const totalArticles = await Article.countDocuments({ status: 'Published' });
 
         res.status(200).json({
             message: 'Public articles fetched successfully',
             count: articles.length,
+            total: totalArticles,
+            currentPage: page,
+            totalPages: Math.ceil(totalArticles / limit),
             articles: articles
         });
     } catch (error) {

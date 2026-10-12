@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title><%= article.title %></title>
+</head>
+<body>
+    <header>
+        <h1><%= article.title %></h1>
+        <p>נכתב על ידי: <%= article.author %> | פורסם בתאריך: <%= article.publishedAt %></p>
+    </header>
+    
+    <main>
+        <section class="article-content">
+            <!-- התוכן המלא מרונדר מהשרת לצורך SEO -->
+            <p><%= article.content %></p>
+        </section>
+    </main>
+</body>
+</html>
