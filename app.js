@@ -56,16 +56,18 @@ mongoose.connect(MONGO_URI)
 
     // ייבוא מודל הכתבות במידת הצורך עבור דף הבית
 const Article = require('./models/Article');
+const { PUBLIC_FILTER, toPublicArticle } = require('./utils/publicArticle');
 
 // Route for the homepage news feed (Server-Side Rendering for SEO)
 app.get('/', async (req, res) => {
     try {
         // שליפת 5 הכתבות הראשונות המפורסמות לצורך הצגה ראשונית בדף הבית
-        const articles = await Article.find({ status: 'Published' })
+        const articles = await Article.find(PUBLIC_FILTER)
+            .populate('reporter', 'username')
             .sort({ 'publishedVersion.publishedAt': -1 })
             .limit(5);
 
-        res.render('index', { articles });
+        res.render('index', { articles: articles.map(toPublicArticle) });
     } catch (err) {
         console.error('Error loading homepage feed:', err);
         res.status(500).send('שגיאת שרת בטעינת הפיד');
