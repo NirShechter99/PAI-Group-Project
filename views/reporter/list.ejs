@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>הכתבות שלי</title>
+</head>
+<body>
+  <main class="reporter-area">
+    <header class="reporter-header">
+      <h1>הכתבות שלי</h1>
+      <a class="btn" href="/reporter/articles/new">+ כתבה חדשה</a>
+    </header>
+
+    <% if (articles.length === 0) { %>
+      <p>עדיין אין לך כתבות.</p>
+    <% } else { %>
+      <table class="articles-table">
+        <thead>
+          <tr><th>כותרת</th><th>סטטוס</th><th>עודכנה</th><th>פעולות</th></tr>
+        </thead>
+        <tbody>
+          <% articles.forEach(a => { const pub = wasPublished(a); %>
+            <tr>
+              <td><%= a.title || '(ללא כותרת)' %></td>
+              <td>
+                <% if (pub && a.status !== 'Published') { %>
+                  <span class="status status-Published">פורסמה</span>
+                  <small>· עדכון: <%= STATUS_LABELS[a.status] %></small>
+                <% } else { %>
+                  <span class="status status-<%= a.status %>"><%= STATUS_LABELS[a.status] %></span>
+                <% } %>
+              </td>
+              <td><%= a.updatedAt.toLocaleString('he-IL') %></td>
+              <td>
+                <a href="/reporter/articles/<%= a._id %>/edit"><%= a.status === 'Pending' ? 'צפייה' : 'עריכה' %></a>
+                <% if (['Draft', 'Returned'].includes(a.status) && !pub) { %>
+                  <form action="/reporter/articles/<%= a._id %>/delete" method="POST" class="inline"
+                        onsubmit="return confirm('למחוק את הטיוטה?')">
+                    <button type="submit" class="link-danger">מחיקה</button>
+                  </form>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </main>
+</body>
+</html>
