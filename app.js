@@ -10,6 +10,9 @@ app.set('view engine', 'ejs');
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Static client files (e.g. public/js/autosave.js)
+app.use(express.static('public'));
+
 const cookieParser = require('cookie-parser');
 app.use(cookieParser());
 
