@@ -43,3 +43,11 @@ exports.requireStaff = (req, res, next) => {
         res.status(403).json({ message: 'Access denied. Staff only.' });
     }
 };
+// Middleware to restrict access to Reporters only (reporter work area)
+exports.requireReporter = (req, res, next) => {
+    if (req.user && req.user.role === 'Reporter') {
+        next();
+    } else {
+        res.status(403).json({ message: 'Access denied. Reporters only.' });
+    }
+};
