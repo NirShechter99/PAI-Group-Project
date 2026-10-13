@@ -34,6 +34,10 @@ app.use('/api/auth', authRoutes);
 const weatherRoutes = require('./routes/weatherRoutes');
 app.use('/api/weather', weatherRoutes);
 
+// Reporter work area (EJS pages)
+const reporterRoutes = require('./routes/reporterRoutes');
+app.use('/reporter', reporterRoutes);
+
 const MONGO_URI = 'mongodb+srv://nir:passwordtest123@cluster0.hwi3ljx.mongodb.net/?appName=Cluster0';
 
 mongoose.connect(MONGO_URI)
