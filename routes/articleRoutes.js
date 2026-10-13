@@ -28,14 +28,21 @@ router.get('/view/:id', async (req, res) => {
         const mongoose = require('mongoose');
         const Article = mongoose.model('Article');
         
-        const article = await Article.findById(req.params.id);
-        
+        const { PUBLIC_FILTER, toPublicArticle } = require('../utils/publicArticle');
+
+        // Only an approved article is public, and only its approved version is shown
+        if (!mongoose.isValidObjectId(req.params.id)) {
+            return res.status(404).send('הכתבה לא נמצאה');
+        }
+        const article = await Article.findOne({ _id: req.params.id, ...PUBLIC_FILTER })
+            .populate('reporter', 'username');
+                    
         if (!article) {
             return res.status(404).send('הכתבה לא נמצאה');
         }
         
         // רינדור קובץ ה-EJS שיצרנו בתיקיית views והעברת הנתונים
-        res.render('article', { article });
+        res.render('article', { article: toPublicArticle(article) });
     } catch (err) {
         console.error(err);
         res.status(500).send('שגיאת שרת');

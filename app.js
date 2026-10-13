@@ -10,6 +10,9 @@ app.set('view engine', 'ejs');
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Static client files (e.g. public/js/autosave.js)
+app.use(express.static('public'));
+
 const cookieParser = require('cookie-parser');
 app.use(cookieParser());
 
@@ -34,6 +37,10 @@ app.use('/api/auth', authRoutes);
 const weatherRoutes = require('./routes/weatherRoutes');
 app.use('/api/weather', weatherRoutes);
 
+// Reporter work area (EJS pages)
+const reporterRoutes = require('./routes/reporterRoutes');
+app.use('/reporter', reporterRoutes);
+
 const MONGO_URI = 'mongodb+srv://nir:passwordtest123@cluster0.hwi3ljx.mongodb.net/?appName=Cluster0';
 
 mongoose.connect(MONGO_URI)
@@ -49,16 +56,18 @@ mongoose.connect(MONGO_URI)
 
     // ייבוא מודל הכתבות במידת הצורך עבור דף הבית
 const Article = require('./models/Article');
+const { PUBLIC_FILTER, toPublicArticle } = require('./utils/publicArticle');
 
 // Route for the homepage news feed (Server-Side Rendering for SEO)
 app.get('/', async (req, res) => {
     try {
         // שליפת 5 הכתבות הראשונות המפורסמות לצורך הצגה ראשונית בדף הבית
-        const articles = await Article.find({ status: 'Published' })
+        const articles = await Article.find(PUBLIC_FILTER)
+            .populate('reporter', 'username')
             .sort({ 'publishedVersion.publishedAt': -1 })
             .limit(5);
 
-        res.render('index', { articles });
+        res.render('index', { articles: articles.map(toPublicArticle) });
     } catch (err) {
         console.error('Error loading homepage feed:', err);
         res.status(500).send('שגיאת שרת בטעינת הפיד');

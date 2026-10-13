@@ -1,11 +1,16 @@
 const mongoose = require('mongoose');
+// Drafts may be incomplete (auto-save stores work in progress).
+// Full validation applies once the article is sent to the editor.
+const requiredUnlessDraft = function () {
+    return !['Draft', 'Returned'].includes(this.status);
+};
 
 // Define the schema for the Article model
 const articleSchema = new mongoose.Schema({
     // --- Work-in-Progress Fields (Reporter's Draft) ---
     title: {
         type: String,
-        required: true
+        required: requiredUnlessDraft
     },
     reporter: {
         type: mongoose.Schema.Types.ObjectId,
@@ -14,15 +19,15 @@ const articleSchema = new mongoose.Schema({
     },
     category: {
         type: String,
-        required: true
+        required: requiredUnlessDraft
     },
     mainImage: {
         type: String,
-        required: true
+        required: requiredUnlessDraft
     },
     content: {
         type: String,
-        required: true
+        required: requiredUnlessDraft
     },
     status: {
         type: String,

@@ -1,5 +1,6 @@
 const Article = require('../models/Article');
 const logger = require('../utils/logger');
+const { PUBLIC_FILTER, toPublicArticle } = require('../utils/publicArticle');
 
 // Create a new article (CRUD: Create)
 exports.createArticle = async (req, res) => {
@@ -166,13 +167,14 @@ exports.getPublicArticles = async (req, res) => {
         const skip = (page - 1) * limit;
 
         // שליפת הכתבות המפורסמות עם מדלג (skip) ומגבלה (limit)
-        const articles = await Article.find({ status: 'Published' })
+        const articles = await Article.find(PUBLIC_FILTER)
+            .populate('reporter', 'username')
             .sort({ 'publishedVersion.publishedAt': -1 }) // מהחדש ישן
             .skip(skip)
             .limit(limit);
 
         // ספירת סך הכל הכתבות המפורסמות לצורך בקרה
-        const totalArticles = await Article.countDocuments({ status: 'Published' });
+        const totalArticles = await Article.countDocuments(PUBLIC_FILTER);
 
         res.status(200).json({
             message: 'Public articles fetched successfully',
@@ -180,7 +182,7 @@ exports.getPublicArticles = async (req, res) => {
             total: totalArticles,
             currentPage: page,
             totalPages: Math.ceil(totalArticles / limit),
-            articles: articles
+            articles: articles.map(toPublicArticle)
         });
     } catch (error) {
         logger.logError('Error fetching public articles', error);
