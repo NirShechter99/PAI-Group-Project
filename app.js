@@ -47,6 +47,24 @@ mongoose.connect(MONGO_URI)
         logger.logError('Failed to connect to MongoDB', err); // Log error
     });
 
+    // ייבוא מודל הכתבות במידת הצורך עבור דף הבית
+const Article = require('./models/Article');
+
+// Route for the homepage news feed (Server-Side Rendering for SEO)
+app.get('/', async (req, res) => {
+    try {
+        // שליפת 5 הכתבות הראשונות המפורסמות לצורך הצגה ראשונית בדף הבית
+        const articles = await Article.find({ status: 'Published' })
+            .sort({ 'publishedVersion.publishedAt': -1 })
+            .limit(5);
+
+        res.render('index', { articles });
+    } catch (err) {
+        console.error('Error loading homepage feed:', err);
+        res.status(500).send('שגיאת שרת בטעינת הפיד');
+    }
+});
+
 // Example of logging the server start
 app.listen(3000, () => {
     const msg = 'Server is running on port 3000';
