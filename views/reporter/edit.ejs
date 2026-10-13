@@ -9,8 +9,7 @@
   <main class="reporter-area">
     <p><a href="/reporter/articles">→ חזרה לכתבות שלי</a></p>
     <h1><%= published ? 'עדכון כתבה שפורסמה' : 'עריכת כתבה' %></h1>
-    <p>סטטוס: <strong><%= STATUS_LABELS[article.status] %></strong></p>
-
+    <p>סטטוס: <strong><%= published && article.status !== 'Published' ? 'פורסמה · עדכון ' + STATUS_LABELS[article.status] : STATUS_LABELS[article.status] %></strong></p>
     <% if (published) { %>
       <p class="notice">הכתבה כבר פורסמה. הקוראים ממשיכים לראות את הגרסה המקורית עד שעורך יאשר את העדכון.</p>
     <% } %>
@@ -55,7 +54,7 @@
       <% } %>
     </form>
   </main>
-  
+
     <script src="/js/autosave.js"></script>
 </body>
 </html>
