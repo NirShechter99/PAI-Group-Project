@@ -100,6 +100,23 @@ exports.saveDraft = async (req, res) => {
     }
 };
 
+// POST /reporter/articles/:id/autosave: background save from the browser, returns JSON
+exports.autosave = async (req, res) => {
+    try {
+        const article = await findOwnArticle(req);
+        if (!article) return res.status(404).json({ ok: false, message: 'Article not found' });
+        if (isLocked(article)) return res.status(409).json({ ok: false, message: 'Article is under review' });
+
+        applyValues(article, req.body);
+        await article.save();
+        res.json({ ok: true, savedAt: article.updatedAt });
+    } catch (error) {
+        logger.logError('Error auto saving article', error);
+        res.status(500).json({ ok: false, message: 'Auto save failed' });
+    }
+};
+
+
 // POST /reporter/articles/:id/submit: send to the editor for approval
 exports.submit = async (req, res) => {
     try {

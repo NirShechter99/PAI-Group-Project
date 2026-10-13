@@ -10,6 +10,7 @@ router.get('/articles', reporterController.list);
 router.get('/articles/new', reporterController.create);
 router.get('/articles/:id/edit', reporterController.editForm);
 router.post('/articles/:id/save', reporterController.saveDraft);
+router.post('/articles/:id/autosave', reporterController.autosave);
 router.post('/articles/:id/submit', reporterController.submit);
 router.post('/articles/:id/delete', reporterController.remove);
 
