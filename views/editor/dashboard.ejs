@@ -1,0 +1,88 @@
+﻿<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>לוח בקרה לעורך | ניהול כתבות</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+    .container { max-width: 1100px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px; }
+    .header h1 { margin: 0; font-size: 24px; }
+    .header-actions a, .header-actions button { margin-right: 10px; padding: 8px 14px; border-radius: 4px; text-decoration: none; font-size: 14px; cursor: pointer; border: 1px solid #ccc; background: #fff; color: #333; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 12px; border-bottom: 1px solid #e0e0e0; text-align: right; }
+    th { background: #f8f9fa; font-weight: bold; }
+    .status { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; display: inline-block; }
+    .status-Pending { background: #fff3cd; color: #856404; }
+    .status-Published { background: #d4edda; color: #155724; }
+    .status-Returned { background: #f8d7da; color: #721c24; }
+    .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .btn { padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 13px; border: none; cursor: pointer; font-weight: bold; }
+    .btn-review { background: #1a73e8; color: white; }
+    .btn-analytics { background: #6f42c1; color: white; }
+    .btn-delete { background: #dc3545; color: white; }
+    form.inline { display: inline; margin: 0; }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>לוח בקרה לעורך הראשי</h1>
+      <div class="header-actions">
+        <a href="/">לעמוד הבית הציבורי</a>
+        <button onclick="logout()">התנתק</button>
+      </div>
+    </header>
+
+    <% if (articles.length === 0) { %>
+      <p>אין כרגע כתבות הממתינות לאישור או כתבות שפורסמו.</p>
+    <% } else { %>
+      <table>
+        <thead>
+          <tr>
+            <th>כותרת</th>
+            <th>כתב</th>
+            <th>קטגוריה</th>
+            <th>סטטוס</th>
+            <th>עודכנה לאחרונה</th>
+            <th>פעולות עורך</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% articles.forEach(a => { const pub = wasPublished(a); %>
+            <tr>
+              <td><strong><%= a.title || '(ללא כותרת)' %></strong></td>
+              <td><%= a.reporter ? a.reporter.username : 'לא ידוע' %></td>
+              <td><%= a.category || '-' %></td>
+              <td>
+                <% if (pub && a.status !== 'Published') { %>
+                  <span class="status status-Published">פורסמה</span>
+                  <small>· עדכון: <span class="status status-<%= a.status %>"><%= STATUS_LABELS[a.status] %></span></small>
+                <% } else { %>
+                  <span class="status status-<%= a.status %>"><%= STATUS_LABELS[a.status] %></span>
+                <% } %>
+              </td>
+              <td><%= a.updatedAt.toLocaleString('he-IL') %></td>
+              <td class="actions">
+                <a class="btn btn-review" href="/editor/articles/<%= a._id %>/review">בדיקה ואישור / השוואה</a>
+                <a class="btn btn-analytics" href="/editor/articles/<%= a._id %>/analytics">גרף צפיות</a>
+                <form action="/editor/articles/<%= a._id %>/delete" method="POST" class="inline" onsubmit="return confirm('האם אתה בטוח שברצונך למחוק את הכתבה לצמיתות?')">
+                  <button type="submit" class="btn btn-delete">מחיקה</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </main>
+
+  <script>
+    async function logout() {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/login';
+    }
+  </script>
+</body>
+</html>
