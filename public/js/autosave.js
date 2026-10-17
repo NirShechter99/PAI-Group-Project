@@ -1,51 +1,56 @@
-// A single request at a time plus revision tracking prevents an older response
-// from clearing changes typed while that request was in flight.
+// Logical revisions order keystrokes independently of network arrival or clock skew.
 (() => {
   const form = document.getElementById("article-form");
   if (!form || form.dataset.locked === "true") return;
   const fields = ["title", "category", "mainImage", "content"];
   const key = `draft-${form.dataset.userId}-${form.dataset.articleId}`;
   const status = document.getElementById("save-status");
-  let revision = 0,
-    savedRevision = 0,
+  let revision = Number(form.dataset.draftClock) || 0;
+  let savedRevision = revision,
     pending = null,
     timer,
     submitting = false;
   const data = () =>
     Object.fromEntries(fields.map((f) => [f, form.elements[f].value]));
-  const backup = () => {
-    try {
-      localStorage.setItem(
-        key,
-        JSON.stringify({ at: Date.now(), data: data() }),
-      );
-    } catch {}
-  };
   const clear = () => {
     try {
       localStorage.removeItem(key);
     } catch {}
   };
+  function backup() {
+    try {
+      localStorage.setItem(
+        key,
+        JSON.stringify({ clock: revision, data: data() }),
+      );
+    } catch {}
+  }
   async function save() {
     if (pending) return pending;
     if (revision === savedRevision) return;
-    const snapshot = revision;
+    const snapshot = revision,
+      values = data();
     status.textContent = "שומר…";
     pending = (async () => {
       try {
         const result = await api(
           `/reporter/articles/${form.dataset.articleId}/autosave`,
-          { method: "POST", body: JSON.stringify(data()) },
+          {
+            method: "POST",
+            body: JSON.stringify({ ...values, draftClock: snapshot }),
+          },
         );
         savedRevision = snapshot;
-        if (revision === snapshot) clear();
-        status.textContent = `נשמר ב־${formatDate(result.savedAt)}`;
+        if (revision === snapshot) {
+          clear();
+          status.textContent = `נשמר ב־${formatDate(result.savedAt)}`;
+        } else status.textContent = "שומר את השינויים האחרונים…";
       } catch (error) {
         status.textContent =
           error.status === 401
             ? "יש להתחבר מחדש. הטיוטה שמורה במכשיר."
             : error.status === 409
-              ? "הכתבה בבדיקה או עודכנה. רעננו כדי לבדוק."
+              ? "קיימת גרסה חדשה בשרת. רעננו כדי להמשיך; הגיבוי המקומי נשמר."
               : "השמירה לא הושלמה. הטיוטה נשמרת במכשיר וננסה שוב.";
       } finally {
         pending = null;
@@ -53,15 +58,37 @@
     })();
     return pending;
   }
+  function restore(local) {
+    fields.forEach((f) => {
+      if (typeof local.data[f] === "string")
+        form.elements[f].value = local.data[f];
+    });
+    revision = Math.max(revision, Number(local.clock) || 0) + 1;
+    backup();
+    save();
+  }
   try {
     const local = JSON.parse(localStorage.getItem(key) || "null");
-    if (local && local.at > Date.parse(form.dataset.serverSavedAt)) {
-      fields.forEach((f) => {
-        if (typeof local.data[f] === "string")
-          form.elements[f].value = local.data[f];
-      });
-      revision++;
-      save();
+    if (local?.data) {
+      const identical = fields.every(
+        (f) => local.data[f] === form.elements[f].value,
+      );
+      if (identical) clear();
+      else if (Number(local.clock) > revision) restore(local);
+      else {
+        // Never silently replace an editor's or another computer's newer version.
+        status.textContent =
+          "קיים גיבוי מקומי שונה. הגרסה העדכנית מהשרת מוצגת.";
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "button subtle";
+        button.textContent = "שחזור הגיבוי המקומי";
+        button.addEventListener("click", () => {
+          restore(local);
+          button.remove();
+        });
+        status.after(button);
+      }
     }
   } catch {}
   fields.forEach((f) =>
@@ -69,21 +96,28 @@
       revision++;
       backup();
       clearTimeout(timer);
-      timer = setTimeout(save, 1000);
+      timer = setTimeout(save, 700);
     }),
   );
   setInterval(() => {
     if (!submitting) save();
-  }, 10000);
-  const beacon = () => {
+  }, 5000);
+  function beacon() {
     if (revision !== savedRevision && !submitting)
       navigator.sendBeacon(
         `/reporter/articles/${form.dataset.articleId}/autosave`,
-        new Blob([JSON.stringify({ ...data(), _csrf: csrfToken() })], {
-          type: "application/json",
-        }),
+        new Blob(
+          [
+            JSON.stringify({
+              ...data(),
+              draftClock: revision,
+              _csrf: csrfToken(),
+            }),
+          ],
+          { type: "application/json" },
+        ),
       );
-  };
+  }
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) beacon();
   });
@@ -94,13 +128,11 @@
     clearTimeout(timer);
     if (!pending && revision === savedRevision) {
       submitting = true;
-      return; // Already saved: allow the original browser submission.
+      return;
     }
     event.preventDefault();
     await save();
-    // Retain a local backup if the navigation fails. Successful server saves have a newer timestamp.
     submitting = true;
-    // Let the current submit event finish before submitting again.
     setTimeout(() => form.requestSubmit(submitter), 0);
   });
 })();

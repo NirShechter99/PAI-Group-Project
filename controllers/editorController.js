@@ -38,11 +38,9 @@ exports.reviewForm = async (req, res) =>
   res.render("editor/review", { article: await getArticle(req) });
 exports.save = async (req, res) => {
   const article = await getArticle(req);
-  if (article.status !== "Pending")
-    return res
-      .status(409)
-      .json({ message: "ניתן לערוך כאן כתבה שממתינה לאישור" });
+  if (article.status === "Published") article.status = "Draft";
   service.applyValues(article, req.body);
+  article.draftClock = (article.draftClock || 0) + 1;
   await article.save();
   res.redirect(`/editor/articles/${article._id}/review?saved=1`);
 };
@@ -62,6 +60,7 @@ exports.returnToReporter = async (req, res) => {
     typeof req.body.editorNote === "string" ? req.body.editorNote.trim() : "";
   if (!note) return res.status(400).json({ message: "יש להזין הערה לכתב" });
   article.status = "Returned";
+  article.draftClock = (article.draftClock || 0) + 1;
   article.editorNote = note.slice(0, 1000);
   await article.save();
   res.redirect("/editor/articles");

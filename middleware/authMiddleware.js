@@ -14,6 +14,7 @@ exports.loadUser = async (req, res, next) => {
     } catch {
       return next();
     }
+    if (!require("mongoose").isValidObjectId(claims.userId)) return next();
     const user = await User.findById(claims.userId).select(
       "username role tokenVersion",
     );

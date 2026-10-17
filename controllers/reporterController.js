@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 const Article = require("../models/Article");
-const logger = require("../utils/logger");
 
 // Hebrew labels for the reporter UI
 const STATUS_LABELS = {
@@ -90,6 +89,7 @@ exports.saveDraft = async (req, res, next) => {
     if (isLocked(article)) return res.redirect("/reporter/articles");
 
     applyValues(article, req.body);
+    article.draftClock = (article.draftClock || 0) + 1;
     await article.save();
     res.redirect(`/reporter/articles/${article._id}/edit?saved=1`);
   } catch (error) {
@@ -108,9 +108,42 @@ exports.autosave = async (req, res, next) => {
         .status(409)
         .json({ ok: false, message: "Article is under review" });
 
+    const sequence = req.body.draftClock ?? (article.draftClock || 0) + 1;
+    if (!Number.isSafeInteger(sequence) || sequence < 1) {
+      return res.status(400).json({ message: "Invalid draft revision" });
+    }
     applyValues(article, req.body);
-    await article.save();
-    res.json({ ok: true, savedAt: article.updatedAt });
+    await article.validate();
+    // Newer keystrokes win even when an unload beacon arrives before an older request.
+    const updated = await Article.findOneAndUpdate(
+      {
+        _id: article._id,
+        reporter: req.user.userId,
+        status: { $in: ["Draft", "Returned", "Published"] },
+        $or: [
+          { draftClock: { $lt: sequence } },
+          { draftClock: { $exists: false } },
+        ],
+      },
+      {
+        $set: {
+          ...Object.fromEntries(
+            EDITABLE_FIELDS.map((field) => [field, article[field] || ""]),
+          ),
+          status: article.status,
+          draftClock: sequence,
+        },
+        $inc: { __v: 1 },
+      },
+      { returnDocument: "after" },
+    );
+    if (!updated)
+      return res
+        .status(409)
+        .json({
+          message: "A newer draft was already saved. Refresh to continue.",
+        });
+    res.json({ ok: true, savedAt: updated.updatedAt, draftClock: sequence });
   } catch (error) {
     next(error);
   }
@@ -142,6 +175,7 @@ exports.submit = async (req, res, next) => {
     }
 
     article.status = "Pending"; // from now on the model requires all fields
+    article.draftClock = (article.draftClock || 0) + 1;
     await article.save();
     res.redirect("/reporter/articles");
   } catch (error) {

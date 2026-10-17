@@ -11,14 +11,25 @@ const app = express();
 app.disable("x-powered-by");
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
-app.use(express.static(path.join(__dirname, "public"), { maxAge: "1h" }));
-app.use(express.json({ limit: "128kb" }));
-app.use(express.urlencoded({ extended: false, limit: "128kb" }));
+app.use(
+  express.static(path.join(__dirname, "public"), {
+    maxAge: config.production ? "1h" : 0,
+  }),
+);
+app.use(express.json({ limit: "256kb" }));
+app.use(express.urlencoded({ extended: false, limit: "256kb" }));
+app.use((req, res, next) => {
+  if (req.body === undefined) req.body = {};
+  if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+    return res.status(400).json({ message: "Request body must be an object" });
+  }
+  next();
+});
 app.use(cookieParser(config.jwtSecret));
 app.use(security);
-app.use(auth.loadUser);
 app.use((req, res, next) => {
   res.set("Cache-Control", "no-store"); // HTML includes a visitor-specific CSRF token.
+  res.locals.currentUser = null;
   res.locals.categories = articles.categories;
   res.locals.STATUS_LABELS = articles.statuses;
   res.locals.date = (value) =>
@@ -35,6 +46,7 @@ app.use((req, res, next) => {
       : "/images/news.svg";
   next();
 });
+app.use(auth.loadUser);
 for (const name of [
   "user",
   "article",
@@ -50,20 +62,17 @@ for (const name of [
 app.use("/reporter", require("./routes/reporterRoutes"));
 app.use("/editor", require("./routes/editorRoutes"));
 app.get("/login", (req, res) => res.render("login"));
-app.get("/", async (req, res) =>
-  res.render("index", {
-    feed: await articles.listPublic(req.query, req.deviceId),
-    filters: req.query,
-  }),
-);
-app.use((req, res) =>
+app.get("/", require("./controllers/publicController").home);
+app.use((req, res) => {
+  if (req.path.startsWith("/api/"))
+    return res.status(404).json({ message: "הנתיב לא נמצא" });
   res
     .status(404)
     .render("error", {
       title: "העמוד לא נמצא",
       message: "אפשר לחזור לחדשות או להשתמש בתפריט הראשי.",
-    }),
-);
+    });
+});
 app.use((error, req, res, next) => {
   let status =
     error.status ||
@@ -84,7 +93,8 @@ app.use((error, req, res, next) => {
       : status === 409
         ? "הפעולה מתנגשת במצב הנוכחי. רעננו ונסו שוב."
         : "הבקשה אינה תקינה או שהפריט אינו זמין.";
-  if (!res.locals.csrf) return res.status(status).type("text/plain").send(message);
+  if (!res.locals.csrf)
+    return res.status(status).type("text/plain").send(message);
   if (req.path.startsWith("/api/") || req.path.endsWith("/autosave"))
     return res.status(status).json({ message });
   res

@@ -60,7 +60,7 @@ exports.update = async (req, res) => {
       .status(409)
       .json({ message: "לא ניתן להסיר את הרשאת העורך של עצמך" });
   const user = await User.findById(req.params.id);
-  if (!user) return res.sendStatus(404);
+  if (!user) return res.status(404).json({ message: "הפריט לא נמצא" });
   for (const f of ["username", "role"])
     if (req.body[f] !== undefined) user[f] = req.body[f];
   if (req.body.password)

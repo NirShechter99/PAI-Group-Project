@@ -17,7 +17,7 @@
 <% if(locked) { %><p class="notice">הכתבה בבדיקת עורך. העריכה תתאפשר לאחר סיום הבדיקה.</p><% } %>
 <form id="article-form" class="panel stack writing-form" action="/reporter/articles/<%= article._id %>/submit"
   method="POST" data-article-id="<%= article._id %>" data-user-id="<%= currentUser.userId %>"
-  data-server-saved-at="<%= article.updatedAt?.toISOString() || '' %>" data-locked="<%= locked %>">
+  data-server-saved-at="<%= article.updatedAt?.toISOString() || '' %>" data-draft-clock="<%= article.draftClock || 0 %>" data-locked="<%= locked %>">
   <input type="hidden" name="_csrf" value="<%= csrf %>">
   <div><label for="title">כותרת הכתבה</label><input class="title-input" id="title" name="title" maxlength="300"
       value="<%= article.title || '' %>" placeholder="כותרת שמזמינה לקרוא" <%= locked?'disabled':'' %>></div>

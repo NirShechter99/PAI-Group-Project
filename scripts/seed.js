@@ -16,7 +16,14 @@ async function seedDatabase(password, { reset = false, count = 500 } = {}) {
     throw new Error(
       "DEMO_PASSWORD must have 10+ characters and at most 72 bytes",
     );
-  if (!reset && (await User.exists({})))
+  if (
+    !reset &&
+    (
+      await Promise.all(
+        [User, Article, Comment, Analytics].map((model) => model.exists({})),
+      )
+    ).some(Boolean)
+  )
     throw new Error(
       "Database is not empty. Explicit --reset is required to replace demo data.",
     );

@@ -22,9 +22,10 @@ function applyValues(article, body) {
     if (body[key] !== undefined) {
       if (typeof body[key] !== "string")
         throw Object.assign(new Error("Invalid field"), { status: 400 });
-      article[key] = body[key]
-        .trim()
-        .slice(0, key === "content" ? 50000 : key === "mainImage" ? 2000 : 300);
+      article[key] = (key === "content" ? body[key] : body[key].trim()).slice(
+        0,
+        key === "content" ? 50000 : key === "mainImage" ? 2000 : 300,
+      );
     }
   if (article.category && !categories[article.category])
     throw Object.assign(new Error("Invalid category"), { status: 400 });
@@ -47,6 +48,7 @@ async function publish(article) {
   article.publishedVersion.publishedAt = publishedAt;
   article.publicationHistory.push({ publishedAt, title: article.title });
   article.status = "Published";
+  article.draftClock = (article.draftClock || 0) + 1;
   article.editorNote = "";
   return article.save();
 }
@@ -70,7 +72,7 @@ async function listPublic(query, deviceId) {
         .replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
       $options: "i",
     };
-  if (categories[query.category])
+  if (Object.hasOwn(categories, query.category))
     filter["publishedVersion.category"] = query.category;
   const readIds = await ReadingHistory.distinct("article", { deviceId });
   if (query.viewed === "read") filter._id = { $in: readIds };
