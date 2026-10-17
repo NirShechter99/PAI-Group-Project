@@ -9,6 +9,7 @@ const requiredUnlessDraft = function () {
 const articleSchema = new mongoose.Schema(
   {
     totalViews: { type: Number, default: 0, min: 0 },
+    draftClock: { type: Number, default: 0, min: 0 },
     publicationHistory: [{ publishedAt: Date, title: String }],
     // --- Work-in-Progress Fields (Reporter's Draft) ---
     title: {

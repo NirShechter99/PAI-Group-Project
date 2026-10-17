@@ -22,16 +22,16 @@
     <form class="stack" action="/editor/articles/<%= article._id %>/save" method="POST"><input type="hidden"
         name="_csrf" value="<%= csrf %>">
       <div><label for="title">כותרת</label><input id="title" name="title" maxlength="300"
-          value="<%= article.title || '' %>" <%= article.status==='Pending'?'':'readonly' %>></div>
+          value="<%= article.title || '' %>"></div>
       <div><label for="category">קטגוריה</label><select id="category" name="category"
-          <%= article.status==='Pending'?'':'disabled' %>><% Object.entries(categories).forEach(([k,v])=>{ %><option
+          ><% Object.entries(categories).forEach(([k,v])=>{ %><option
             value="<%= k %>" <%= article.category===k?'selected':'' %>><%= v %></option><% }) %></select></div>
       <div><label for="mainImage">תמונה ראשית</label><input id="mainImage" name="mainImage"
-          value="<%= article.mainImage || '' %>" <%= article.status==='Pending'?'':'readonly' %>></div>
+          value="<%= article.mainImage || '' %>"></div>
       <div><label for="content">תוכן</label><textarea id="content" name="content" rows="16" maxlength="50000"
-          <%= article.status==='Pending'?'':'readonly' %>><%= article.content || '' %></textarea></div>
-      <% if(article.status==='Pending') { %><button class="button subtle">שמירת תיקוני העורך</button><small
-        class="muted">יש לשמור את התיקונים לפני אישור הפרסום.</small><% } %>
+         ><%= article.content || '' %></textarea></div>
+      <button class="button subtle">שמירת תיקוני העורך</button><small
+        class="muted">יש לשמור לפני פרסום. שינוי כתבה שפורסמה יוצר טיוטה חדשה; הכתב מגיש אותה לאישור.</small>
     </form>
   </section>
 </div>

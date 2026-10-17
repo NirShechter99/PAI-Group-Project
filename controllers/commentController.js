@@ -56,9 +56,9 @@ exports.updateComment = async (req, res) => {
   const comment = await Comment.findByIdAndUpdate(
     req.params.id,
     { content: req.body.content.trim() },
-    { returnDocument: 'after', runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
-  if (!comment) return res.sendStatus(404);
+  if (!comment) return res.status(404).json({ message: "הפריט לא נמצא" });
   res.json({ comment: publicComment(comment) });
 };
 exports.deleteComment = async (req, res) => {

@@ -15,6 +15,7 @@ const analyticsSchema = new mongoose.Schema({
   views: {
     type: Number,
     default: 1,
+    min: 0,
   },
 });
 

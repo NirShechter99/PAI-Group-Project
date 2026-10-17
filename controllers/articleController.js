@@ -30,6 +30,7 @@ exports.updateArticle = async (req, res) => {
     return res.status(409).json({ message: "הכתבה נמצאת בבדיקת עורך" });
   if (article.status === "Published") article.status = "Draft";
   service.applyValues(article, req.body);
+  article.draftClock = (article.draftClock || 0) + 1;
   await article.save();
   res.json({ article });
 };

@@ -59,7 +59,9 @@ class Client {
   }
 }
 before(async () => {
-  mongo = await MongoMemoryServer.create({ instance: { args: process.platform === 'win32' ? [] : ['--nounixsocket'] } });
+  mongo = await MongoMemoryServer.create({
+    instance: { args: process.platform === "win32" ? [] : ["--nounixsocket"] },
+  });
   await mongoose.connect(mongo.getUri());
   await Promise.all([
     Article.init(),
@@ -289,27 +291,307 @@ test("sessions survive app listener restart and are revoked on logout", async ()
   assert.equal((await editor.request("/api/users")).status, 401);
 });
 
-test('a real Node process restart preserves authentication against the same database', async () => {
-  const { fork } = require('node:child_process');
-  const path = require('node:path');
+test("a real Node process restart preserves authentication against the same database", async () => {
+  const { fork } = require("node:child_process");
+  const path = require("node:path");
   const previousBase = base;
   let child;
   async function launch() {
-    child = fork(path.join(__dirname, 'server-child.js'), [], {
-      env: { ...process.env, MONGO_URI: mongo.getUri(), JWT_SECRET: process.env.JWT_SECRET },
-      stdio: ['ignore', 'ignore', 'pipe', 'ipc']
+    child = fork(path.join(__dirname, "server-child.js"), [], {
+      env: {
+        ...process.env,
+        MONGO_URI: mongo.getUri(),
+        JWT_SECRET: process.env.JWT_SECRET,
+      },
+      stdio: ["ignore", "ignore", "pipe", "ipc"],
     });
-    const port = await new Promise((resolve,reject) => {
-      child.once('message', value => resolve(value.port));
-      child.once('exit', code => reject(new Error(`Child exited ${code}`)));
+    const port = await new Promise((resolve, reject) => {
+      child.once("message", (value) => resolve(value.port));
+      child.once("exit", (code) => reject(new Error(`Child exited ${code}`)));
     });
     base = `http://127.0.0.1:${port}`;
   }
-  async function stop() { const stopped=new Promise(r=>child.once('exit',r));child.kill('SIGTERM');await stopped; }
+  async function stop() {
+    const stopped = new Promise((r) => child.once("exit", r));
+    child.kill("SIGTERM");
+    await stopped;
+  }
   try {
     await launch();
-    const client=await new Client().login('Reporter1');
-    await stop();await launch();
-    assert.equal((await client.request('/reporter/articles')).status,200);
-  } finally { if(child?.exitCode===null)await stop();base=previousBase; }
+    const client = await new Client().login("Reporter1");
+    await stop();
+    await launch();
+    assert.equal((await client.request("/reporter/articles")).status, 200);
+  } finally {
+    if (child?.exitCode === null) await stop();
+    base = previousBase;
+  }
+});
+
+test("all four core models support authorized CRUD and never expose password hashes", async () => {
+  const editor = await new Client().login("MainEditor");
+  const created = await editor.request("/api/users/create", "POST", {
+    username: "AuditReporter",
+    password,
+    role: "Reporter",
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.data.user.password, undefined);
+  const uid = created.data.user._id;
+  assert.ok(
+    (await editor.request("/api/users?q=AuditReporter")).data.users.some(
+      (u) => u._id === uid,
+    ),
+  );
+  assert.equal(
+    (
+      await editor.request(`/api/users/${uid}`, "PUT", {
+        username: "AuditRenamed",
+      })
+    ).status,
+    200,
+  );
+  const user = await User.findById(uid);
+  assert.notEqual(user.password, password);
+  assert.ok(user.password.startsWith("$2"));
+  const made = await editor.request("/api/articles/create", "POST", {
+    reporter: uid,
+    title: "CRUD audit",
+    category: "Technology",
+    content: "Original",
+    mainImage: "/images/news.svg",
+  });
+  assert.equal(made.status, 201);
+  const id = made.data.article._id;
+  assert.equal(
+    (
+      await editor.request(`/api/articles/update/${id}`, "PUT", {
+        title: "CRUD changed",
+      })
+    ).status,
+    200,
+  );
+  assert.ok(
+    (await editor.request("/api/articles/all")).data.articles.some(
+      (a) => a._id === id,
+    ),
+  );
+  // The reporter submits; editors cannot bypass the pending-only publication rule.
+  await Article.updateOne({ _id: id }, { $set: { status: "Pending" } });
+  assert.equal(
+    (await editor.request(`/api/articles/publish/${id}`, "PUT", {})).status,
+    200,
+  );
+  const guest = new Client();
+  await guest.request("/");
+  const comment = await guest.request("/api/comments/create", "POST", {
+    article: id,
+    content: "CRUD comment",
+  });
+  assert.equal(comment.status, 201);
+  const cid = comment.data.comment._id;
+  assert.ok(
+    (await guest.request(`/api/comments/article/${id}`)).data.comments.some(
+      (c) => c._id === cid,
+    ),
+  );
+  assert.equal(
+    (
+      await editor.request(`/api/comments/update/${cid}`, "PUT", {
+        content: "Edited comment",
+      })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (await editor.request(`/api/comments/delete/${cid}`, "DELETE", {})).status,
+    200,
+  );
+  assert.equal(
+    (await editor.request(`/api/analytics/record/${id}`, "POST", {})).status,
+    200,
+  );
+  const report = await editor.request(`/api/analytics/article/${id}`);
+  const aid = report.data.data[0]._id;
+  assert.equal(
+    (await editor.request(`/api/analytics/update/${aid}`, "PUT", { views: 12 }))
+      .status,
+    200,
+  );
+  assert.equal((await Article.findById(id)).totalViews, 12);
+  assert.equal(
+    (await editor.request(`/api/analytics/update/${aid}`, "PUT", { views: -1 }))
+      .status,
+    400,
+  );
+  assert.equal(
+    (await editor.request(`/api/analytics/delete/${aid}`, "DELETE", {})).status,
+    200,
+  );
+  assert.equal(
+    (await editor.request(`/api/articles/delete/${id}`, "DELETE", {})).status,
+    200,
+  );
+  assert.equal(
+    (await editor.request(`/api/users/${uid}`, "DELETE", {})).status,
+    200,
+  );
+});
+
+test("autosave ignores out-of-order drafts and preserves whitespace and maximum Unicode content", async () => {
+  const reporter = await new Client().login("Reporter1");
+  const created = await reporter.request("/reporter/articles/new", "POST", {});
+  const id = created.headers.get("location").split("/")[3];
+  const content = "  \n" + "字".repeat(49990) + "\n  ";
+  assert.equal(
+    (
+      await reporter.request(`/reporter/articles/${id}/autosave`, "POST", {
+        content,
+        draftClock: 2,
+      })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await reporter.request(`/reporter/articles/${id}/autosave`, "POST", {
+        content: "Older request",
+        draftClock: 1,
+      })
+    ).status,
+    409,
+  );
+  assert.equal((await Article.findById(id)).content, content);
+  const page = await reporter.request(`/reporter/articles/${id}/edit`);
+  assert.equal(page.status, 200);
+  assert.ok(page.text.includes('data-draft-clock="2"'));
+});
+
+test("editors can edit all article states while public snapshots remain unchanged", async () => {
+  const editor = await new Client().login("MainEditor");
+  for (const state of ["Draft", "Returned", "Pending", "Published"]) {
+    const article = await Article.findOne({ status: state });
+    const original = article.publishedVersion?.content;
+    const page = await editor.request(`/editor/articles/${article._id}/review`);
+    assert.equal(page.status, 200);
+    assert.ok(page.text.includes("שמירת תיקוני העורך"));
+    const result = await editor.request(
+      `/editor/articles/${article._id}/save`,
+      "POST",
+      { content: "Editor changed the working content" },
+    );
+    assert.equal(result.status, 302);
+    const updated = await Article.findById(article._id);
+    assert.equal(updated.content, "Editor changed the working content");
+    assert.equal(updated.publishedVersion?.content, original);
+    assert.equal(updated.status, state === "Published" ? "Draft" : state);
+  }
+});
+
+test("literal search characters and invalid payloads do not crash the server", async () => {
+  const guest = new Client();
+  await guest.request("/");
+  for (const q of [
+    "[",
+    "]",
+    "(",
+    ")",
+    "*",
+    "+",
+    "?",
+    "\\",
+    "^",
+    "$",
+    "{",
+    "}",
+    "|",
+  ]) {
+    const r = await guest.request(
+      "/api/articles/public?q=" + encodeURIComponent(q),
+    );
+    assert.equal(r.status, 200, `query ${q}`);
+  }
+  const malformed = await fetch(base + "/api/auth/login", {
+    method: "POST",
+    headers: {
+      Cookie: Object.entries(guest.cookies)
+        .map(([k, v]) => `${k}=${v}`)
+        .join("; "),
+      "X-CSRF-Token": guest.csrf,
+      "Content-Type": "application/json",
+    },
+    body: "[1,2]",
+  });
+  assert.equal(malformed.status, 400);
+  assert.equal((await guest.request("/")).status, 200);
+});
+
+test("thousands of articles remain pageable and concurrent visits retain exact view counts", async () => {
+  const reporter = await User.findOne({ role: "Reporter" }),
+    ids = [];
+  const docs = Array.from({ length: 2500 }, (_, i) => {
+    const _id = new mongoose.Types.ObjectId();
+    ids.push(_id);
+    return {
+      _id,
+      reporter: reporter._id,
+      title: `Scale ${i}`,
+      category: "Technology",
+      mainImage: "/images/news.svg",
+      content: "Scale data",
+      status: "Published",
+      publishedVersion: {
+        title: `Scale ${i}`,
+        category: "Technology",
+        mainImage: "/images/news.svg",
+        content: "Scale data",
+        publishedAt: new Date(Date.now() - i * 1000),
+      },
+      totalViews: 0,
+    };
+  });
+  await Article.insertMany(docs);
+  const guest = new Client();
+  await guest.request("/");
+  const start = performance.now();
+  const first = await guest.request("/api/articles/public?q=Scale&page=1"),
+    second = await guest.request("/api/articles/public?q=Scale&page=2");
+  assert.equal(first.data.total, 2500);
+  assert.equal(first.data.articles.length, 20);
+  assert.equal(second.data.articles.length, 20);
+  assert.ok(
+    !second.data.articles.some((b) =>
+      first.data.articles.some((a) => a._id === b._id),
+    ),
+  );
+  const id = ids[0];
+  const visits = await Promise.all(
+    Array.from({ length: 50 }, () => guest.request(`/api/articles/view/${id}`)),
+  );
+  assert.ok(visits.every((r) => r.status === 200));
+  assert.equal((await Article.findById(id)).totalViews, 50);
+  assert.equal((await Analytics.findOne({ article: id })).views, 50);
+  console.log(
+    `Scale check: ${await Article.countDocuments()} articles, two filtered pages and 50 concurrent visits: ${Math.round(performance.now() - start)}ms (local test, not a production capacity guarantee)`,
+  );
+  await Article.deleteMany({ _id: { $in: ids } });
+  await Analytics.deleteMany({ article: { $in: ids } });
+  await require("../models/ReadingHistory").deleteMany({
+    article: { $in: ids },
+  });
+});
+
+test("read-only preflight confirms the seeded defense examples", async () => {
+  const check = await require("../scripts/preflight").checkDatabase();
+  assert.equal(check.ok, true, JSON.stringify(check));
+});
+
+test("a signed but malformed identity is treated as unauthenticated", async () => {
+  const client = new Client();
+  await client.request("/login");
+  client.cookies.token = require("jsonwebtoken").sign(
+    { userId: "not-an-id", version: 0 },
+    process.env.JWT_SECRET,
+  );
+  assert.equal((await client.request("/api/users")).status, 401);
 });

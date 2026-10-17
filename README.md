@@ -7,7 +7,7 @@ A Hebrew, RTL news application for the Internet Applications course. Node.js + E
 Prerequisites: Node.js **22 or newer**, npm, and a running MongoDB instance (local MongoDB Community Server or your own Atlas database). Internet access is needed for weather. The news application remains usable if weather is unavailable.
 
 ```sh
-git clone --branch feature/ui-weather-docs https://github.com/yuvalg2001/PAI-Group-Project.git
+git clone --branch audit/submission-ready https://github.com/yuvalg2001/PAI-Group-Project.git
 cd PAI-Group-Project
 npm ci
 ```
@@ -30,6 +30,7 @@ Open **http://localhost:3000**. Log in at `/login` using `MainEditor` or `Report
 - `npm run dev`: restart the server on source changes.
 - `npm run seed`: populate an empty database with 500 articles, six staff accounts, comments, 48 hours of view counts, and multiple publication events per published article.
 - `npm run seed -- --reset`: **deletes existing project data** before seeding. Use only on a disposable demo database, with the team's agreement.
+- `npm run preflight`: read-only check of your actual demo database (500 articles, staff accounts, all states, comments, multiple publications and view history), plus live weather. Run this on the presentation computer after seeding.
 - `npm run check`: JavaScript syntax check.
 - `npm test`: integration tests against an isolated temporary MongoDB and mocked weather tests. No team database is contacted. The test helper may download a MongoDB binary on first run; it is a development-only dependency. For browser tests run `npx playwright install chromium` once, then `npm run test:browser`.
 
@@ -43,7 +44,7 @@ For deployment, set `NODE_ENV=production` and use HTTPS; authentication and CSRF
 | Article `/api/articles/view/:id` | Full article text rendered in initial HTML for SEO; author, category, date and image; each visit increments hourly analytics and records read status for the browser. |
 | Comments | Ajax creation without reloading the list; paged existing comments; server-enforced rolling limit of three submissions per browser per minute, plus client feedback. |
 | Reporter `/reporter/articles` | Own articles only; creation, draft editing, autosave, submission, editorial notes and published-update workflow. |
-| Editor `/editor/articles` | All articles with status filters and pagination; side-by-side approved and working versions; edit pending submissions, approve, return with notes, delete and inspect analytics. |
+| Editor `/editor/articles` | All articles with status filters and pagination; side-by-side approved and working versions; edit working content in every state, approve pending submissions, return with notes, delete and inspect analytics. |
 | Analytics | Hourly views on a numeric time axis; every publication has an exact timestamp marker; accessible source table and publication timeline. |
 | Authentication | bcrypt passwords, HTTP-only JWT cookie, current roles loaded from MongoDB, CSRF protection, login throttling and logout revocation. A normal restart does not invalidate sessions. |
 | Weather | Open-Meteo current conditions for Tel Aviv; server-side caching, concurrent-request sharing, timeout, retry cooldown, source attribution and client expiry. |
@@ -77,7 +78,7 @@ docs/                        Contribution workflow, defense guide and verificati
 
 The article's working fields are separate from `publishedVersion`. Only an editor can copy a **Pending** submission into the public snapshot. Every approval appends to `publicationHistory`; subsequent edits never overwrite that history. The flow is `Draft → Pending → Published`, or `Pending → Returned → Pending`. Editing a published article begins a new draft while the approved version remains public. Server checks enforce ownership, roles and valid transitions.
 
-Autosave uses a serialized request, a revision counter, local backup and a final beacon. Successfully acknowledged saves are available from another computer. Unsynced work during an outage remains on the original browser and cannot appear on a different computer until the connection recovers. The UI reports that state rather than claiming the server saved it.
+Autosave uses a serialized request, a persistent logical draft revision, local backup and a final beacon. The server rejects older revisions, so a late request cannot overwrite newer keystrokes. Unsynced local revisions are recovered on refresh without comparing computer clocks. Successfully acknowledged saves are available from another computer. Unsynced work during an outage remains on the original browser and cannot appear on a different computer until the connection recovers. The UI reports that state rather than claiming the server saved it.
 
 ## API and permissions
 
@@ -111,4 +112,4 @@ The cache is per server process. Multiple replicas need a shared cache to avoid 
 
 ## Team and defense
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch/PR workflow and [docs/DEFENSE.md](docs/DEFENSE.md) for your explanation and demonstration checklist. All students must understand the complete implementation, including AI-assisted changes, as required by the course. Commit history records the original teammates' work; final integration includes the editor branch and documents corrective changes.
+See [docs/SUBMISSION_AUDIT.md](docs/SUBMISSION_AUDIT.md) for the final requirement audit and tonight's submission checks. See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch/PR workflow and [docs/DEFENSE.md](docs/DEFENSE.md) for your explanation and demonstration checklist. All students must understand the complete implementation, including AI-assisted changes, as required by the course. Commit history records the original teammates' work; final integration includes the editor branch and documents corrective changes.
