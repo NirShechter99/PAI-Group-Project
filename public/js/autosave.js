@@ -1,81 +1,106 @@
-// Work continuity: the draft is saved in the background, nothing is lost on refresh or when the browser closes.
-// Three layers of protection:
-//   1. localStorage: saved instantly on every keystroke (works even offline)
-//   2. fetch to the server: 1.5 seconds after the reporter stops typing, plus a retry every 10 seconds
-//   3. sendBeacon: a last save when the page is closed or refreshed
-(function () {
-  const form = document.getElementById('article-form');
-  if (!form || form.dataset.locked === 'true') return;
-
-  const url = `/reporter/articles/${form.dataset.articleId}/autosave`;
-  const storageKey = `article-draft-${form.dataset.articleId}`;
-  const statusEl = document.getElementById('save-status');
-  const FIELDS = ['title', 'category', 'mainImage', 'content'];
-
-  let timer = null;
-  let dirty = false;
-
-  const getData = () => Object.fromEntries(FIELDS.map((f) => [f, form.elements[f].value]));
-  const setStatus = (text) => { statusEl.textContent = text; };
-
-  function saveLocal() {
-    try { localStorage.setItem(storageKey, JSON.stringify({ savedAt: Date.now(), data: getData() })); } catch (e) {}
-  }
-
-  function clearLocal() {
-    try { localStorage.removeItem(storageKey); } catch (e) {}
-  }
-
-  async function saveToServer() {
-    if (!dirty) return;
-    setStatus('שומר...');
+// A single request at a time plus revision tracking prevents an older response
+// from clearing changes typed while that request was in flight.
+(() => {
+  const form = document.getElementById("article-form");
+  if (!form || form.dataset.locked === "true") return;
+  const fields = ["title", "category", "mainImage", "content"];
+  const key = `draft-${form.dataset.userId}-${form.dataset.articleId}`;
+  const status = document.getElementById("save-status");
+  let revision = 0,
+    savedRevision = 0,
+    pending = null,
+    timer,
+    submitting = false;
+  const data = () =>
+    Object.fromEntries(fields.map((f) => [f, form.elements[f].value]));
+  const backup = () => {
     try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(getData())
-      });
-      if (res.status === 409) return setStatus('הכתבה אצל העורך, לא ניתן לשמור שינויים');
-      if (res.status === 401) return setStatus('נותקת מהמערכת. הטיוטה שמורה במחשב שלך, התחברי מחדש');
-      if (!res.ok) throw new Error(res.status);
-      const { savedAt } = await res.json();
-      dirty = false;
-      clearLocal();
-      setStatus('נשמר אוטומטית ב ' + new Date(savedAt).toLocaleTimeString('he-IL'));
-    } catch (e) {
-      setStatus('אין חיבור לשרת. הטיוטה שמורה במחשב שלך ותישלח שוב');
-    }
+      localStorage.setItem(
+        key,
+        JSON.stringify({ at: Date.now(), data: data() }),
+      );
+    } catch {}
+  };
+  const clear = () => {
+    try {
+      localStorage.removeItem(key);
+    } catch {}
+  };
+  async function save() {
+    if (pending) return pending;
+    if (revision === savedRevision) return;
+    const snapshot = revision;
+    status.textContent = "שומר…";
+    pending = (async () => {
+      try {
+        const result = await api(
+          `/reporter/articles/${form.dataset.articleId}/autosave`,
+          { method: "POST", body: JSON.stringify(data()) },
+        );
+        savedRevision = snapshot;
+        if (revision === snapshot) clear();
+        status.textContent = `נשמר ב־${formatDate(result.savedAt)}`;
+      } catch (error) {
+        status.textContent =
+          error.status === 401
+            ? "יש להתחבר מחדש. הטיוטה שמורה במכשיר."
+            : error.status === 409
+              ? "הכתבה בבדיקה או עודכנה. רעננו כדי לבדוק."
+              : "השמירה לא הושלמה. הטיוטה נשמרת במכשיר וננסה שוב.";
+      } finally {
+        pending = null;
+      }
+    })();
+    return pending;
   }
-
-  // Restore from localStorage if it is newer than what the server has
   try {
-    const local = JSON.parse(localStorage.getItem(storageKey) || 'null');
-    const serverTime = form.dataset.serverSavedAt ? new Date(form.dataset.serverSavedAt).getTime() : 0;
-    if (local && local.savedAt > serverTime) {
-      FIELDS.forEach((f) => { if (local.data[f] !== undefined) form.elements[f].value = local.data[f]; });
-      setStatus('שוחזרה טיוטה שלא הספיקה להישמר בשרת');
-      dirty = true;
-      saveToServer();
+    const local = JSON.parse(localStorage.getItem(key) || "null");
+    if (local && local.at > Date.parse(form.dataset.serverSavedAt)) {
+      fields.forEach((f) => {
+        if (typeof local.data[f] === "string")
+          form.elements[f].value = local.data[f];
+      });
+      revision++;
+      save();
     }
-  } catch (e) {}
-
-  // Every change: save locally now, save to the server after a short pause
-  FIELDS.forEach((f) => form.elements[f].addEventListener('input', () => {
-    dirty = true;
-    saveLocal();
-    clearTimeout(timer);
-    timer = setTimeout(saveToServer, 1500);
-  }));
-
-  // Safety net: retry every 10 seconds if something was not saved
-  setInterval(saveToServer, 10000);
-
-  // Last save when leaving the page
-  window.addEventListener('pagehide', () => {
-    if (!dirty) return;
-    navigator.sendBeacon(url, new Blob([JSON.stringify(getData())], { type: 'application/json' }));
+  } catch {}
+  fields.forEach((f) =>
+    form.elements[f].addEventListener("input", () => {
+      revision++;
+      backup();
+      clearTimeout(timer);
+      timer = setTimeout(save, 1000);
+    }),
+  );
+  setInterval(() => {
+    if (!submitting) save();
+  }, 10000);
+  const beacon = () => {
+    if (revision !== savedRevision && !submitting)
+      navigator.sendBeacon(
+        `/reporter/articles/${form.dataset.articleId}/autosave`,
+        new Blob([JSON.stringify({ ...data(), _csrf: csrfToken() })], {
+          type: "application/json",
+        }),
+      );
+  };
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) beacon();
   });
-
-  // When the form is submitted the server gets everything, no backup needed
-  form.addEventListener('submit', () => { dirty = false; clearLocal(); });
+  window.addEventListener("pagehide", beacon);
+  form.addEventListener("submit", async (event) => {
+    if (submitting) return;
+    const submitter = event.submitter;
+    clearTimeout(timer);
+    if (!pending && revision === savedRevision) {
+      submitting = true;
+      return; // Already saved: allow the original browser submission.
+    }
+    event.preventDefault();
+    await save();
+    // Retain a local backup if the navigation fails. Successful server saves have a newer timestamp.
+    submitting = true;
+    // Let the current submit event finish before submitting again.
+    setTimeout(() => form.requestSubmit(submitter), 0);
+  });
 })();

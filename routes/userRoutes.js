@@ -1,9 +1,9 @@
-const express = require('express');
-const router = express.Router();
-const userController = require('../controllers/userController');
-
-// Route to handle POST requests for creating a new user
-router.post('/create', userController.createUser);
-
-// Export the router to be used in the main app file
+const router = require("express").Router();
+const c = require("../controllers/userController");
+const a = require("../middleware/authMiddleware");
+router.use(a.verifyToken, a.requireEditor);
+router.get("/", c.list);
+router.post("/create", c.createUser);
+router.put("/:id", c.update);
+router.delete("/:id", c.remove);
 module.exports = router;

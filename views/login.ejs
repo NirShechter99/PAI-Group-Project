@@ -1,79 +1,24 @@
-﻿<!DOCTYPE html>
-<html lang="he" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>התחברות למערכת | The Daily Web</title>
-  <style>
-    body { font-family: Arial, sans-serif; background: #f4f6f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-    .login-card { background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 380px; }
-    h1 { margin-top: 0; font-size: 24px; text-align: center; color: #333; }
-    .form-group { margin-bottom: 15px; }
-    label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
-    input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-    button { width: 100%; padding: 10px; background: #1a73e8; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; font-weight: bold; }
-    button:hover { background: #1558b0; }
-    .error-msg { color: #d93025; background: #fce8e6; padding: 10px; border-radius: 4px; display: none; margin-bottom: 15px; text-align: center; }
-    .links { margin-top: 15px; text-align: center; font-size: 14px; }
-    .links a { color: #1a73e8; text-decoration: none; }
-  </style>
-</head>
-<body>
-  <main class="login-card">
-    <h1>התחברות לצוות</h1>
-    <div id="errorBox" class="error-msg"></div>
-    <form id="loginForm">
-      <div class="form-group">
-        <label for="username">שם משתמש</label>
-        <input type="text" id="username" name="username" required autocomplete="username">
+<%- include('partials/top', { title: 'כניסת צוות' }) %>
+<div class="login-layout">
+  <section class="login-intro">
+    <p class="eyebrow">THE NEWSROOM</p>
+    <h1>הסיפור הבא<br>מתחיל אצלך<span class="accent">.</span></h1>
+    <p class="lead">מרחב העבודה של הכתבים והעורכים.<br>מטיוטה ראשונה ועד הכותרת הראשית.</p>
+    <div class="login-decoration" aria-hidden="true"><span>01 / רעיון</span><span>02 / כתיבה</span><span>03 /
+        פרסום</span></div>
+  </section>
+  <section class="panel login-card">
+    <h2>ברוכים השבים</h2>
+    <p class="muted">התחברו לחשבון צוות המערכת שלכם.</p>
+    <form id="loginForm" class="stack">
+      <div><label for="username">שם משתמש</label><input id="username" name="username" required autocomplete="username">
       </div>
-      <div class="form-group">
-        <label for="password">סיסמה</label>
-        <input type="password" id="password" name="password" required autocomplete="current-password">
-      </div>
-      <button type="submit">התחבר</button>
-    </form>
-    <div class="links">
-      <a href="/">חזרה לעמוד הבית הציבורי</a>
-    </div>
-  </main>
-
-  <script>
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const errorBox = document.getElementById('errorBox');
-      errorBox.style.display = 'none';
-
-      const username = document.getElementById('username').value.trim();
-      const password = document.getElementById('password').value;
-
-      try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
-        });
-        const data = await res.json();
-
-        if (!res.ok) {
-          errorBox.textContent = data.message || 'שם משתמש או סיסמה שגויים';
-          errorBox.style.display = 'block';
-          return;
-        }
-
-        // הפניה אוטומטית לפי התפקיד של המשתמש
-        if (data.user && data.user.role === 'Editor') {
-          window.location.href = '/editor/articles';
-        } else if (data.user && data.user.role === 'Reporter') {
-          window.location.href = '/reporter/articles';
-        } else {
-          window.location.href = '/';
-        }
-      } catch (err) {
-        errorBox.textContent = 'שגיאת תקשורת עם השרת';
-        errorBox.style.display = 'block';
-      }
-    });
-  </script>
-</body>
-</html>
+      <div><label for="password">סיסמה</label><input id="password" name="password" type="password" required
+          autocomplete="current-password"></div>
+      <p id="errorBox" class="error-message" role="alert" hidden></p><button class="button" type="submit">כניסה למערכת
+        ←</button>
+    </form><a class="return-link" href="/">חזרה לקריאת החדשות</a>
+  </section>
+</div>
+<script src="/js/login.js" defer></script>
+<%- include('partials/bottom') %>

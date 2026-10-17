@@ -1,53 +1,43 @@
-const jwt = require('jsonwebtoken');
-
-const JWT_SECRET = 'TheDailyWeb_SecretKey_2026';
-
-// Middleware to verify if the user is logged in
-exports.verifyToken = (req, res, next) => {
-    // 1. Get the token from the cookies
-    const token = req.cookies.token;
-
-    // 2. If there is no token, deny access
-    if (!token) {
-        return res.status(401).json({ message: 'Access denied. Please log in.' });
-    }
-
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
+const { jwtSecret } = require("../config");
+// Load current roles and account state on every request; signed sessions survive restart.
+exports.loadUser = async (req, res, next) => {
+  req.user = null;
+  res.locals.currentUser = null;
+  if (req.cookies.token) {
+    let claims;
     try {
-        // 3. Verify the token using our secret key
-        const decoded = jwt.verify(token, JWT_SECRET);
-        
-        // 4. Attach the decoded user data (userId, role) to the request object
-        req.user = decoded;
-        
-        // 5. Move to the next function (the Controller)
-        next();
-    } catch (error) {
-        res.status(401).json({ message: 'Invalid or expired token.' });
+      claims = jwt.verify(req.cookies.token, jwtSecret, {
+        algorithms: ["HS256"],
+      });
+    } catch {
+      return next();
     }
-};
-
-// Middleware to restrict access to Editors only
-exports.requireEditor = (req, res, next) => {
-    if (req.user && req.user.role === 'Editor') {
-        next();
-    } else {
-        res.status(403).json({ message: 'Access denied. Editors only.' });
+    const user = await User.findById(claims.userId).select(
+      "username role tokenVersion",
+    );
+    if (user && (user.tokenVersion || 0) === claims.version) {
+      req.user = {
+        userId: String(user._id),
+        username: user.username,
+        role: user.role,
+      };
+      res.locals.currentUser = req.user;
     }
+  }
+  next();
 };
-
-// Middleware to restrict access to Reporters or Editors
-exports.requireStaff = (req, res, next) => {
-    if (req.user && (req.user.role === 'Reporter' || req.user.role === 'Editor')) {
-        next();
-    } else {
-        res.status(403).json({ message: 'Access denied. Staff only.' });
-    }
+exports.verifyToken = (req, res, next) => {
+  if (req.user) return next();
+  if (req.method === "GET" && !req.originalUrl.startsWith("/api/"))
+    return res.redirect("/login");
+  res.status(401).json({ message: "יש להתחבר למערכת" });
 };
-// Middleware to restrict access to Reporters only (reporter work area)
-exports.requireReporter = (req, res, next) => {
-    if (req.user && req.user.role === 'Reporter') {
-        next();
-    } else {
-        res.status(403).json({ message: 'Access denied. Reporters only.' });
-    }
+const requireRole = (roles) => (req, res, next) => {
+  if (req.user && roles.includes(req.user.role)) return next();
+  res.status(403).json({ message: "אין לך הרשאה לפעולה זו" });
 };
+exports.requireEditor = requireRole(["Editor"]);
+exports.requireStaff = requireRole(["Reporter", "Editor"]);
+exports.requireReporter = requireRole(["Reporter"]);

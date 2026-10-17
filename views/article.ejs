@@ -1,20 +1,36 @@
-<!DOCTYPE html>
-<html lang="he" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <title><%= article.title %></title>
-</head>
-<body>
-    <header>
+<%- include('partials/top', { title: article.title, description: (article.content || '').slice(0,160) }) %>
+<div class="breadcrumb"><a href="/">עמוד הבית</a><span>/</span><a
+    href="/?category=<%= article.category %>"><%= categories[article.category] || article.category %></a></div>
+<div class="page-layout">
+  <div>
+    <article class="full-article">
+      <header>
+        <p class="eyebrow"><%= categories[article.category] || article.category %></p>
         <h1><%= article.title %></h1>
-        <p>נכתב על ידי: <%= article.author %> | פורסם בתאריך: <%= article.publishedAt %></p>
-    </header>
-    
-    <main>
-        <section class="article-content">
-            <!-- התוכן המלא מרונדר מהשרת לצורך SEO -->
-            <p><%= article.content %></p>
-        </section>
-    </main>
-</body>
-</html>
+        <div class="article-meta"><strong><%= article.author %></strong><time
+            datetime="<%= new Date(article.publishedAt).toISOString() %>"><%= date(article.publishedAt) %></time></div>
+      </header>
+      <figure><img class="article-image" src="<%= safeImage(article.mainImage) %>"
+          alt="תמונה מלווה לכתבה: <%= article.title %>"></figure>
+      <div class="article-content"><% (article.content || '').split(/\n+/).forEach(paragraph => { %><p><%= paragraph %>
+        </p><% }) %></div>
+    </article>
+    <section class="comments panel" aria-labelledby="comments-title" data-article="<%= article._id %>">
+      <div class="section-title">
+        <h2 id="comments-title">השיחה שלכם</h2><span>תגובות הקוראים</span>
+      </div>
+      <form id="comment-form" class="stack">
+        <div><label for="authorName">שם לתצוגה</label><input name="authorName" id="authorName" maxlength="80"
+            placeholder="אורח"></div>
+        <div><label for="comment-content">מה דעתך?</label><textarea id="comment-content" name="content" rows="3"
+            maxlength="2000" required placeholder="מוזמנים להוסיף נקודת מבט…"></textarea></div>
+        <div class="actions"><button class="button" type="submit">פרסום תגובה</button><small class="muted">עד 3 תגובות
+            בדקה מהמכשיר</small></div>
+      </form>
+      <p id="comment-status" role="status"></p>
+      <div id="comments-list"></div><button id="more-comments" class="button subtle" hidden>תגובות נוספות</button>
+    </section>
+  </div><%- include('partials/weather') %>
+</div>
+<script src="/js/comments.js" defer></script>
+<%- include('partials/bottom') %>

@@ -1,60 +1,42 @@
-<!DOCTYPE html>
-<html lang="he" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>עריכת כתבה</title>
-</head>
-<body>
-  <main class="reporter-area">
-    <p><a href="/reporter/articles">→ חזרה לכתבות שלי</a></p>
-    <h1><%= published ? 'עדכון כתבה שפורסמה' : 'עריכת כתבה' %></h1>
-    <p>סטטוס: <strong><%= published && article.status !== 'Published' ? 'פורסמה · עדכון ' + STATUS_LABELS[article.status] : STATUS_LABELS[article.status] %></strong></p>
-    <% if (published) { %>
-      <p class="notice">הכתבה כבר פורסמה. הקוראים ממשיכים לראות את הגרסה המקורית עד שעורך יאשר את העדכון.</p>
-    <% } %>
-
-    <% if (article.status === 'Returned' && article.editorNote) { %>
-      <section class="editor-notes">
-        <h2>הערות העורך</h2>
-        <p><%= article.editorNote %></p>
-      </section>
-    <% } %>
-
-    <% if (error) { %><p class="error"><%= error %></p><% } %>
-    <% if (saved) { %><p class="success">הטיוטה נשמרה</p><% } %>
-    <% if (locked) { %><p class="notice">הכתבה נמצאת כרגע אצל העורך ולכן אי אפשר לערוך אותה.</p><% } %>
-
-    <form id="article-form" action="/reporter/articles/<%= article._id %>/submit" method="POST"
-          data-article-id="<%= article._id %>"
-          data-server-saved-at="<%= article.updatedAt ? article.updatedAt.toISOString() : '' %>"
-          data-locked="<%= locked %>">
-      <label for="title">כותרת</label>
-      <input id="title" name="title" type="text" maxlength="300" value="<%= article.title || '' %>" <%= locked ? 'disabled' : '' %>>
-
-      <label for="category">קטגוריה</label>
-      <select id="category" name="category" <%= locked ? 'disabled' : '' %>>
-        <option value="">בחרי קטגוריה</option>
-        <% ['Technology', 'Sports', 'Politics', 'Economy', 'Entertainment'].forEach(cat => { %>
-          <option value="<%= cat %>" <%= article.category === cat ? 'selected' : '' %>><%= cat %></option>
-        <% }) %>
-      </select>
-
-      <label for="mainImage">קישור לתמונה ראשית</label>
-      <input id="mainImage" name="mainImage" type="url" value="<%= article.mainImage || '' %>" <%= locked ? 'disabled' : '' %>>
-
-      <label for="content">תוכן</label>
-      <textarea id="content" name="content" rows="18" <%= locked ? 'disabled' : '' %>><%= article.content || '' %></textarea>
-
-      <p id="save-status" aria-live="polite"></p>
-
-      <% if (!locked) { %>
-        <button type="submit" formaction="/reporter/articles/<%= article._id %>/save">שמירת טיוטה</button>
-        <button type="submit">שליחה לאישור עורך</button>
-      <% } %>
-    </form>
-  </main>
-
-    <script src="/js/autosave.js"></script>
-</body>
-</html>
+<%- include('../partials/top', { title: 'עריכת כתבה' }) %>
+<div class="breadcrumb"><a href="/reporter/articles">סביבת הכתב</a><span>/</span><span>עריכת כתבה</span></div>
+<section class="page-heading">
+  <div>
+    <p class="eyebrow">מילים שהופכות לסיפור</p>
+    <h1><%= published ? 'מעדכנים את הסיפור' : 'יוצרים סיפור חדש' %><span class="accent">.</span></h1>
+  </div><span class="badge <%= article.status %>"><%= STATUS_LABELS[article.status] %></span>
+</section>
+<% if(published) { %><div class="notice">הגרסה המאושרת ממשיכה להופיע באתר. השינויים יופיעו לקוראים לאחר אישור עורך.
+</div><% } %>
+<% if(article.status==='Returned' && article.editorNote) { %><section class="notice">
+  <h2>הערות מהעורך</h2>
+  <p><%= article.editorNote %></p>
+</section><% } %>
+<% if(error) { %><p class="error-message" role="alert"><%= error %></p><% } %>
+<% if(saved) { %><p class="success">הטיוטה נשמרה</p><% } %>
+<% if(locked) { %><p class="notice">הכתבה בבדיקת עורך. העריכה תתאפשר לאחר סיום הבדיקה.</p><% } %>
+<form id="article-form" class="panel stack writing-form" action="/reporter/articles/<%= article._id %>/submit"
+  method="POST" data-article-id="<%= article._id %>" data-user-id="<%= currentUser.userId %>"
+  data-server-saved-at="<%= article.updatedAt?.toISOString() || '' %>" data-locked="<%= locked %>">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <div><label for="title">כותרת הכתבה</label><input class="title-input" id="title" name="title" maxlength="300"
+      value="<%= article.title || '' %>" placeholder="כותרת שמזמינה לקרוא" <%= locked?'disabled':'' %>></div>
+  <div class="form-row">
+    <div><label for="category">קטגוריה</label><select id="category" name="category" <%= locked?'disabled':'' %>>
+        <option value="">בחירת קטגוריה</option><% Object.entries(categories).forEach(([k,v]) => { %><option
+          value="<%= k %>" <%= article.category===k?'selected':'' %>><%= v %></option><% }) %>
+      </select></div>
+    <div><label for="mainImage">קישור לתמונה ראשית (HTTPS)</label><input id="mainImage" name="mainImage" type="text"
+        maxlength="2000" dir="ltr" value="<%= article.mainImage || '' %>" placeholder="https://…"
+        <%= locked?'disabled':'' %>><small class="muted">אפשר להשתמש ב־/images/news.svg לתמונת ההדגמה.</small></div>
+  </div>
+  <div><label for="content">תוכן הכתבה</label><textarea id="content" name="content" rows="18" maxlength="50000"
+      placeholder="הסיפור שלך מתחיל כאן…" <%= locked?'disabled':'' %>><%= article.content || '' %></textarea></div>
+  <div class="form-footer">
+    <p id="save-status" role="status">השמירה האוטומטית פועלת בזמן הכתיבה</p><% if(!locked) { %><div class="actions">
+      <button class="button subtle" formaction="/reporter/articles/<%= article._id %>/save">שמירת טיוטה</button><button
+        class="button">שליחה לאישור עורך ←</button></div><% } %>
+  </div>
+</form>
+<script src="/js/autosave.js" defer></script>
+<%- include('../partials/bottom') %>

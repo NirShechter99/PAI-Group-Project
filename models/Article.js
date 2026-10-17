@@ -1,55 +1,69 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 // Drafts may be incomplete (auto-save stores work in progress).
 // Full validation applies once the article is sent to the editor.
 const requiredUnlessDraft = function () {
-    return !['Draft', 'Returned'].includes(this.status);
+  return !["Draft", "Returned"].includes(this.status);
 };
 
 // Define the schema for the Article model
-const articleSchema = new mongoose.Schema({
+const articleSchema = new mongoose.Schema(
+  {
+    totalViews: { type: Number, default: 0, min: 0 },
+    publicationHistory: [{ publishedAt: Date, title: String }],
     // --- Work-in-Progress Fields (Reporter's Draft) ---
     title: {
-        type: String,
-        required: requiredUnlessDraft
+      type: String,
+      required: requiredUnlessDraft,
     },
     reporter: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
     },
     category: {
-        type: String,
-        required: requiredUnlessDraft
+      type: String,
+      required: requiredUnlessDraft,
     },
     mainImage: {
-        type: String,
-        required: requiredUnlessDraft
+      type: String,
+      required: requiredUnlessDraft,
     },
     content: {
-        type: String,
-        required: requiredUnlessDraft
+      type: String,
+      required: requiredUnlessDraft,
     },
     status: {
-        type: String,
-        enum: ['Draft', 'Pending', 'Published', 'Returned'],
-        default: 'Draft'
+      type: String,
+      enum: ["Draft", "Pending", "Published", "Returned"],
+      default: "Draft",
     },
     editorNote: {
-        type: String,
-        default: ''
+      type: String,
+      default: "",
     },
-    
+
     // --- Published Version Fields (Public Facing) ---
     // This object holds the snapshot of the last approved version.
     publishedVersion: {
-        title: { type: String },
-        category: { type: String },
-        mainImage: { type: String },
-        content: { type: String },
-        publishedAt: { type: Date }
-    }
-}, {
-    timestamps: true
-});
+      title: { type: String },
+      category: { type: String },
+      mainImage: { type: String },
+      content: { type: String },
+      publishedAt: { type: Date },
+    },
+  },
+  {
+    timestamps: true,
+    optimisticConcurrency: true,
+  },
+);
 
-module.exports = mongoose.models.Article || mongoose.model('Article', articleSchema);
+articleSchema.index({ "publishedVersion.publishedAt": -1 });
+articleSchema.index({
+  "publishedVersion.category": 1,
+  "publishedVersion.publishedAt": -1,
+});
+articleSchema.index({ totalViews: -1 });
+articleSchema.index({ reporter: 1, updatedAt: -1 });
+module.exports =
+  mongoose.models.Article || mongoose.model("Article", articleSchema);

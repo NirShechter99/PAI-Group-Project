@@ -1,106 +1,67 @@
-const Comment = require('../models/Comment');
-const logger = require('../utils/logger');
-
-// Create a new comment with anti-spam protection (Max 3 per minute per IP)
+const Comment = require("../models/Comment");
+const Article = require("../models/Article");
+const reserve = require("../services/rateLimit");
+const { PUBLIC_FILTER } = require("../utils/publicArticle");
+const publicComment = (c) => ({
+  _id: c._id,
+  authorName: c.authorName,
+  content: c.content,
+  createdAt: c.createdAt,
+});
 exports.createComment = async (req, res) => {
-    try {
-        const { article, authorName, content } = req.body;
-        
-        // Extract the user's IP address from the request
-        const userIp = req.ip || req.connection.remoteAddress;
-
-        // --- Anti-Spam Mechanism ---
-        // 1. Calculate the exact time 1 minute ago
-        const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
-        
-        // 2. Count how many comments this IP saved in the database since 'oneMinuteAgo'
-        const recentCommentsCount = await Comment.countDocuments({
-            ipAddress: userIp,
-            createdAt: { $gte: oneMinuteAgo }
-        });
-
-        // 3. If the count is 3 or more, reject the request
-        if (recentCommentsCount >= 3) {
-            return res.status(429).json({ 
-                message: 'Spam protection: You can only post 3 comments per minute. Please wait.' 
-            });
-        }
-        // ---------------------------
-
-        // Create a new Comment instance
-        const newComment = new Comment({
-            article: article,
-            authorName: authorName, // Will use 'Guest' if not provided
-            content: content,
-            ipAddress: userIp
-        });
-
-        // Save the comment to the database
-        const savedComment = await newComment.save();
-
-        res.status(201).json({
-            message: 'Comment added successfully',
-            comment: savedComment
-        });
-    } catch (error) {
-        logger.logError('Error creating comment', error);
-
-        res.status(500).json({ 
-            message: 'Error creating comment', 
-            error: error.message 
-        });
-    }
+  const { article, authorName, content } = req.body;
+  if (typeof content !== "string" || !content.trim() || content.length > 2000)
+    return res
+      .status(400)
+      .json({ message: "יש להזין תגובה באורך עד 2,000 תווים" });
+  if (!(await Article.exists({ _id: article, ...PUBLIC_FILTER })))
+    return res.status(404).json({ message: "כתבה לא נמצאה" });
+  if (!(await reserve(`comments:${req.deviceId}`, 3, 60000))) {
+    res.set("Retry-After", "60");
+    return res
+      .status(429)
+      .json({ message: "ניתן לפרסם עד 3 תגובות בדקה. נסו שוב בעוד דקה." });
+  }
+  const comment = await Comment.create({
+    article,
+    content: content.trim(),
+    authorName:
+      typeof authorName === "string" && authorName.trim()
+        ? authorName.trim().slice(0, 80)
+        : "אורח",
+    ipAddress: req.ip,
+  });
+  res.status(201).json({ comment: publicComment(comment) });
 };
-
-// Get all comments for a specific article (CRUD: Read)
 exports.getCommentsByArticle = async (req, res) => {
-    try {
-        // Extract the article ID from the URL parameters
-        const articleId = req.params.articleId;
-
-        // Find all comments where the 'article' field matches the requested ID
-        // .sort({ createdAt: -1 }) will order them from newest to oldest
-        const comments = await Comment.find({ article: articleId }).sort({ createdAt: -1 });
-
-        res.status(200).json({
-            message: 'Comments fetched successfully',
-            count: comments.length,
-            comments: comments
-        });
-    } catch (error) {
-        logger.logError('Error fetching comments by article', error);
-
-        res.status(500).json({ 
-            message: 'Error fetching comments', 
-            error: error.message 
-        });
-    }
+  if (!(await Article.exists({ _id: req.params.articleId, ...PUBLIC_FILTER })))
+    return res.status(404).json({ message: "כתבה לא נמצאה" });
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const comments = await Comment.find({ article: req.params.articleId })
+    .sort({ createdAt: -1, _id: -1 })
+    .skip((page - 1) * 20)
+    .limit(21);
+  res.json({
+    comments: comments.slice(0, 20).map(publicComment),
+    hasMore: comments.length > 20,
+  });
 };
-
-// Update an existing comment (CRUD: Update)
 exports.updateComment = async (req, res) => {
-    try {
-        const updatedComment = await Comment.findByIdAndUpdate(
-            req.params.id, 
-            req.body, 
-            { new: true, runValidators: true }
-        );
-        if (!updatedComment) return res.status(404).json({ message: 'Comment not found' });
-        res.status(200).json({ message: 'Comment updated', comment: updatedComment });
-    } catch (error) {
-        logger.logError('Error updating comment', error);
-        res.status(500).json({ message: 'Error updating comment', error: error.message });
-    }
+  if (
+    typeof req.body.content !== "string" ||
+    !req.body.content.trim() ||
+    req.body.content.length > 2000
+  )
+    return res.status(400).json({ message: "תגובה לא תקינה" });
+  const comment = await Comment.findByIdAndUpdate(
+    req.params.id,
+    { content: req.body.content.trim() },
+    { returnDocument: 'after', runValidators: true },
+  );
+  if (!comment) return res.sendStatus(404);
+  res.json({ comment: publicComment(comment) });
 };
-
-// Delete a comment (CRUD: Delete)
 exports.deleteComment = async (req, res) => {
-    try {
-        const deletedComment = await Comment.findByIdAndDelete(req.params.id);
-        if (!deletedComment) return res.status(404).json({ message: 'Comment not found' });
-        res.status(200).json({ message: 'Comment deleted successfully' });
-    } catch (error) {
-        logger.logError('Error deleting comment', error);
-        res.status(500).json({ message: 'Error deleting comment', error: error.message });
-    }
+  await Comment.findByIdAndDelete(req.params.id);
+  res.json({ ok: true });
 };

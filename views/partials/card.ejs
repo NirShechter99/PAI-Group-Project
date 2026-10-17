@@ -1,0 +1,12 @@
+<article class="news-card" data-article-id="<%= item._id %>">
+  <a class="card-image" href="/api/articles/view/<%= item._id %>" tabindex="-1" aria-hidden="true"><img
+      src="<%= safeImage(item.mainImage) %>" alt="" loading="lazy"></a>
+  <div class="card-body">
+    <div class="card-kicker"><span><%= categories[item.category] || item.category %></span><% if(item.viewed) { %><span
+        class="read-label">כבר קראת</span><% } %></div>
+    <h2><a href="/api/articles/view/<%= item._id %>"><%= item.title %></a></h2>
+    <p class="excerpt"><%= (item.content || '').slice(0,155) %>…</p>
+    <div class="byline"><span><%= item.author %></span><time
+        datetime="<%= new Date(item.publishedAt).toISOString() %>"><%= date(item.publishedAt) %></time></div>
+  </div>
+</article>

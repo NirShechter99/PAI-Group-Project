@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="<%= csrf %>">
+  <meta name="description"
+    content="<%= typeof description !== 'undefined' ? description : 'The Daily Web — חדשות, רעיונות והסיפורים שמאחוריהם.' %>">
+  <title><%= title %> | The Daily Web</title>
+  <link rel="stylesheet" href="/css/site.css">
+  <script src="/js/site.js" defer></script>
+</head>
+
+<body>
+  <a class="skip-link" href="#main">דילוג לתוכן</a>
+  <div class="utility">
+    <div class="wrap utility-inner"><span>חדשות. הקשר. נקודת
+        מבט.</span><time><%= new Date().toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) %></time>
+    </div>
+  </div>
+  <header class="site-header">
+    <div class="wrap masthead">
+      <a class="brand" href="/" aria-label="The Daily Web — עמוד הבית"><span class="brand-mark"
+          aria-hidden="true">DW<span>•</span></span><span><strong dir="ltr">THE DAILY WEB</strong><small>הסיפור מתחיל
+            כאן</small></span></a>
+      <div class="account"><% if (currentUser) { %><span><%= currentUser.username %></span><button id="logout"
+          class="button subtle" type="button">התנתקות</button><% } else { %><a class="button subtle" href="/login">כניסת
+          צוות <span aria-hidden="true">↗</span></a><% } %></div>
+    </div>
+    <nav class="site-nav" aria-label="ניווט ראשי">
+      <div class="wrap nav-inner">
+        <a href="/" class="nav-home">העדכונים האחרונים</a>
+        <% Object.entries(categories).forEach(([value,label]) => { %><a
+          href="/?category=<%= value %>"><%= label %></a><% }) %>
+        <% if (currentUser?.role === 'Reporter') { %><a href="/reporter/articles" class="staff-link">סביבת
+          הכתב</a><% } %>
+        <% if (currentUser?.role === 'Editor') { %><a href="/editor/articles" class="staff-link">מערכת העריכה</a><% } %>
+      </div>
+    </nav>
+  </header>
+  <main id="main" class="wrap main-content">
