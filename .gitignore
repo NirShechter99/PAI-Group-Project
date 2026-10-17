@@ -142,3 +142,5 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 .vs/
+# Generated visual QA output (regenerate with npm run test:browser).
+docs/screenshots/
