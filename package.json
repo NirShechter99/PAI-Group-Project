@@ -1,7 +1,7 @@
 {
   "name": "pai-group-project",
   "version": "1.0.0",
-  "description": "The Daily Web \u2014 academic MVC news application",
+  "description": "The Daily Web — academic MVC news application",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
@@ -30,7 +30,14 @@
     "ejs": "^6.0.1",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.11.2",
+    "mongoose": "^9.10.2",
     "multer": "^2.4.0"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^11.3.0",
+    "playwright": "^1.64.1"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

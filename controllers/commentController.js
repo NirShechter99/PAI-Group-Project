@@ -9,67 +9,42 @@ const publicComment = (c) => ({
   createdAt: c.createdAt,
 });
 exports.createComment = async (req, res) => {
-    try {
-        // תמיכה בשני שמות השדה (article או articleId) למניעת שגיאות ולידציה
-        const articleRef = req.body.article || req.body.articleId;
-        const { authorName, content } = req.body;
-        
-        // Extract the user's IP address from the request
-        const userIp = req.ip || req.connection.remoteAddress;
-
-        // --- Anti-Spam Mechanism ---
-        const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
-        
-        const recentCommentsCount = await Comment.countDocuments({
-            ipAddress: userIp,
-            createdAt: { $gte: oneMinuteAgo }
-        });
-
-        if (recentCommentsCount >= 3) {
-            return res.status(429).json({ 
-                message: 'Spam protection: You can only post 3 comments per minute. Please wait.' 
-            });
-        }
-        // ---------------------------
-
-        const newComment = new Comment({
-            article: articleRef,
-            authorName: authorName && authorName.trim() ? authorName.trim() : 'Guest',
-            content: content,
-            ipAddress: userIp
-        });
-
-        const savedComment = await newComment.save();
-
-        res.status(201).json({
-            message: 'Comment added successfully',
-            comment: savedComment
-        });
-    } catch (error) {
-        logger.logError('Error creating comment', error);
-        res.status(500).json({ 
-            message: 'Error creating comment', 
-            error: error.message 
-        });
-    }
+  const { article, authorName, content } = req.body;
+  if (typeof content !== "string" || !content.trim() || content.length > 2000)
+    return res
+      .status(400)
+      .json({ message: "יש להזין תגובה באורך עד 2,000 תווים" });
+  if (!(await Article.exists({ _id: article, ...PUBLIC_FILTER })))
+    return res.status(404).json({ message: "כתבה לא נמצאה" });
+  if (!(await reserve(`comments:${req.deviceId}`, 3, 60000))) {
+    res.set("Retry-After", "60");
+    return res
+      .status(429)
+      .json({ message: "ניתן לפרסם עד 3 תגובות בדקה. נסו שוב בעוד דקה." });
+  }
+  const comment = await Comment.create({
+    article,
+    content: content.trim(),
+    authorName:
+      typeof authorName === "string" && authorName.trim()
+        ? authorName.trim().slice(0, 80)
+        : "אורח",
+    ipAddress: req.ip,
+  });
+  res.status(201).json({ comment: publicComment(comment) });
 };
 exports.getCommentsByArticle = async (req, res) => {
-    try {
-        const articleId = req.params.articleId;
-        const comments = await Comment.find({ article: articleId }).sort({ createdAt: -1 });
-
-        res.status(200).json({
-            message: 'Comments fetched successfully',
-            count: comments.length,
-            comments: comments
-        });
-    } catch (error) {
-        logger.logError('Error fetching comments by article', error);
-        res.status(500).json({ 
-            message: 'Error fetching comments', 
-            error: error.message 
-        });
-    }
+  if (!(await Article.exists({ _id: req.params.articleId, ...PUBLIC_FILTER })))
+    return res.status(404).json({ message: "כתבה לא נמצאה" });
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const comments = await Comment.find({ article: req.params.articleId })
+    .sort({ createdAt: -1, _id: -1 })
+    .skip((page - 1) * 20)
+    .limit(21);
+  res.json({
+    comments: comments.slice(0, 20).map(publicComment),
+    hasMore: comments.length > 20,
+  });
 };
 exports.updateComment = async (req, res) => {
   if (

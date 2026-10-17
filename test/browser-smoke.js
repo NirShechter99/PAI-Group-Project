@@ -160,6 +160,20 @@ let db, server, browser;
   );
   await page.reload();
   assert.equal(await page.locator("#title").inputValue(), "סיפור מהדפדפן");
+  // Exercise PR #4's upload/remove controls with the repaired autosave flow.
+  const uploadedSave = page.waitForResponse(r => r.url().endsWith("/autosave") && r.request().postDataJSON()?.mainImage?.startsWith("/uploads/") && r.status() === 200);
+  await page.locator("#image-file").setInputFiles({ name: "pixel.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=", "base64") });
+  await uploadedSave;
+  const uploadedUrl = await page.locator("#mainImage").inputValue();
+  assert.match(uploadedUrl, /^\/uploads\/[a-f0-9]{32}\.png$/);
+  await page.reload();
+  assert.equal(await page.locator("#mainImage").inputValue(), uploadedUrl);
+  const removedSave = page.waitForResponse(r => r.url().endsWith("/autosave") && r.request().postDataJSON()?.mainImage === "" && r.status() === 200);
+  await page.locator("#remove-image").click();
+  await removedSave;
+  assert.equal(await page.locator("#mainImage").inputValue(), "");
+  await page.locator("#mainImage").fill("/images/news.svg");
+  await require("node:fs/promises").unlink(require("node:path").join(__dirname, "..", "public", uploadedUrl));
   // Recreate the previous data-loss window: an older write succeeds but its response
   // is delayed while the author types newer text and immediately refreshes.
   let signalWritten, releaseResponse;

@@ -32,7 +32,8 @@ function applyValues(article, body) {
   if (
     article.mainImage &&
     !/^https:\/\//i.test(article.mainImage) &&
-    article.mainImage !== "/images/news.svg"
+    article.mainImage !== "/images/news.svg" &&
+    !/^\/uploads\/[a-f0-9]{32}\.(png|jpg|webp)$/.test(article.mainImage)
   )
     throw Object.assign(new Error("Image must use HTTPS"), { status: 400 });
 }

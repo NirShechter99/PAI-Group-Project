@@ -3,15 +3,27 @@ const Analytics = require("../models/Analytics");
 const service = require("../services/articles");
 const logger = require("../utils/logger");
 exports.dashboard = async (req, res) => {
-    try {
-        // מציג כתבות שממתינות לאישור או שפורסמו, מהחדש לישן
-        const articles = await Article.find({ status: { $in: ['Pending', 'Published', 'Returned'] } }).populate('reporter', 'username').sort({ updatedAt: -1 });
-
-        res.render('editor/dashboard', { articles, STATUS_LABELS, wasPublished });
-    } catch (error) {
-        logger.logError('Error loading editor dashboard', error);
-        res.status(500).send('שגיאה בטעינת לוח הבקרה של העורך');
-    }
+  const filter = service.statuses[req.query.status]
+    ? { status: req.query.status }
+    : {};
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const [articles, total, pending] = await Promise.all([
+    Article.find(filter)
+      .populate("reporter", "username")
+      .sort({ updatedAt: -1 })
+      .skip((page - 1) * 20)
+      .limit(20),
+    Article.countDocuments(filter),
+    Article.countDocuments({ status: "Pending" }),
+  ]);
+  res.render("editor/dashboard", {
+    articles,
+    total,
+    pending,
+    page,
+    pages: Math.ceil(total / 20),
+    selectedStatus: req.query.status || "",
+  });
 };
 async function getArticle(req) {
   const article = await Article.findById(req.params.id).populate(

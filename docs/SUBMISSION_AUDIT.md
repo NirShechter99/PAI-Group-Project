@@ -4,7 +4,16 @@
 
 The audited application passes the functional checks below after the fixes in this branch. Submission readiness still depends on the team completing the manual items at the end. No statement here certifies the team's actual laptop/database, credential rotation, course registration or Moodle submission.
 
-Audit base: group `main` at `36901108651b13b41a042ccfbe157f496e2e8050`, which merged the finishing work in PR #5. The audit branch contains the additional corrections below. Submit and demonstrate the same final revision, including those corrections.
+Audit base for the latest repair: group `main` at `4c24451a5f42bbbd25c12e52f173081886dea1c1`, after PR #4. That merge failed syntax checks and could not start. This repair restores the validated configuration, authentication, controllers and shared responsive templates, and integrates image upload/removal and Open Graph metadata. The results below describe the repaired branch, which must be merged before using group main for presentation. Submit and demonstrate the same final revision.
+
+## Post-PR #4 integration repairs
+
+- Fixed syntax errors in authentication middleware and the reporter controller, and restored environment configuration instead of embedded database/signing credentials or automatic weak-password accounts.
+- Restored live DB role checks, CSRF, logout revocation, validated public search with 20-item pagination, atomic per-browser comment limiting and public-safe comment responses.
+- Restored logical autosave revisions, all-state editor access, snapshot isolation, shared weather/sidebar/navigation and responsive templates. The conflicting standalone screen rewrite could not preserve these contracts and was replaced with the shared templates.
+- Kept image upload/removal through a dedicated ownership-checked, CSRF-protected multipart endpoint. Images are limited to 3 MB PNG/JPEG/WebP signatures, stored with random filenames and carried through the usual autosave and editor approval flow. Old files are retained so replacing a draft image does not break the public snapshot; automatic orphan-file cleanup is not implemented.
+- Kept SEO additions as escaped Open Graph/article metadata in the shared head. Removed a committed runtime upload, restored test dependencies and Node requirements, and corrected README clone instructions to the group repository.
+- Added server and browser regressions for upload authorization, CSRF, malformed/oversized uploads, reload recovery, removal and published-image isolation.
 
 ## Corrections made in the audit
 
@@ -57,7 +66,7 @@ Audit base: group `main` at `36901108651b13b41a042ccfbe157f496e2e8050`, which me
 ## Final check results
 
 - JavaScript syntax checks passed.
-- **15/15 automated tests passed**, including complete CRUD, negative permissions, actual Node restart, stale autosaves and demo preflight.
+- **16/16 automated tests passed**, including complete CRUD, negative permissions, actual Node restart, stale autosaves and demo preflight.
 - Chromium workflow and all eight page types passed at 1440px, 768px and 390px; no page overflow or uncaught page exceptions.
 - An actual refresh during a delayed autosave recovered the newest keystrokes; a separate browser context loaded the same server-persisted draft.
 - Infinite scroll loaded a second batch; the weather UI removed expired data during a simulated outage and recovered after retry.
@@ -73,7 +82,7 @@ The browser checks cover Chromium, not every browser/device. The size/concurrenc
 ## Team actions tonight — חובה לפני הגשה
 
 1. **Check Moodle immediately.** The PDF mentions both submission up to 24 hours before the defense and closure at 23:59 on the preceding day. Confirm the actual course deadline and submit tonight as applicable; do not assume you can submit tomorrow.
-2. **Use the audited branch / final ZIP.** PR #4 (the separate frontend/image-management rewrite) is still open and changes many of the same files; it is not part of this tested release. Review it with the team and do not merge it into the submission without re-testing. The earlier ZIP predates these corrections. Merge the audit branch into the group repository, or use the supplied audited source ZIP and ensure the linked Git revision matches it. Submit exactly the code you will demonstrate.
+2. **Merge the post-PR #4 repair and freeze the final revision.** PR #4 is now merged. Its initial merge introduced startup, security and workflow regressions; use the repaired revision documented here. Earlier ZIPs predate this integration. Generate the submission ZIP from the final merged source and demonstrate that same code.
 3. **Run on the presentation computer:** `npm ci`, copy .env.example to .env, configure your own MONGO_URI/JWT_SECRET/DEMO_PASSWORD, start MongoDB, seed an empty demo DB, then `npm run preflight`, `npm run check`, `npm test`, `npm start`. Never run `seed -- --reset` on data you intend to keep.
 4. **Confirm the output of preflight on your real database.** This audit cannot inspect your local or Atlas demonstration data. Prepare MainEditor and Reporter1 accounts, a draft, a pending article, a returned article and a published article with several updates.
 5. **Rotate historical credentials.** Current files are clean, but earlier Git commits exposed a MongoDB password, JWT key and weather key. Their owners must revoke/replace them. Git history was not rewritten and credential rotation cannot be verified here.
