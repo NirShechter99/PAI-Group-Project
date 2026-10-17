@@ -7,7 +7,7 @@ A Hebrew, RTL news application for the Internet Applications course. Node.js + E
 Prerequisites: Node.js **22 or newer**, npm, and a running MongoDB instance (local MongoDB Community Server or your own Atlas database). Internet access is needed for weather. The news application remains usable if weather is unavailable.
 
 ```sh
-git clone --branch audit/submission-ready https://github.com/yuvalg2001/PAI-Group-Project.git
+git clone https://github.com/NirShechter99/PAI-Group-Project.git
 cd PAI-Group-Project
 npm ci
 ```
@@ -35,6 +35,8 @@ Open **http://localhost:3000**. Log in at `/login` using `MainEditor` or `Report
 - `npm test`: integration tests against an isolated temporary MongoDB and mocked weather tests. No team database is contacted. The test helper may download a MongoDB binary on first run; it is a development-only dependency. For browser tests run `npx playwright install chromium` once, then `npm run test:browser`.
 
 For deployment, set `NODE_ENV=production` and use HTTPS; authentication and CSRF cookies then use `Secure`. Keep `JWT_SECRET` unchanged across server restarts so existing sessions remain valid. Never reuse credentials previously committed in this repository: removing them from the current files does not remove them from Git history. Owners must rotate the old database password, JWT secret and OpenWeather API key. This branch does not rewrite team history.
+
+Image uploads: reporters can upload PNG, JPEG or WebP files up to 3 MB from their own unlocked article. The server checks file signatures, uses random filenames and enforces ownership and CSRF. Removing an image changes the draft; an existing approved image remains public until approval. Keep `public/uploads` on persistent storage when deploying. Old files are retained to preserve published snapshots; periodic orphan-file cleanup is not implemented.
 
 ## Screens and features
 

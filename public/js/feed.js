@@ -25,7 +25,7 @@
     link.tabIndex = -1;
     link.setAttribute("aria-hidden", "true");
     const img = dom("img");
-    img.src = /^https:\/\//i.test(item.mainImage || "")
+    img.src = (/^https:\/\//i.test(item.mainImage || "") || /^\/uploads\/[a-f0-9]{32}\.(png|jpg|webp)$/.test(item.mainImage || ""))
       ? item.mainImage
       : "/images/news.svg";
     img.alt = "";

@@ -1,202 +1,54 @@
-﻿<!DOCTYPE html>
-<html lang="he" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>לוח בקרה לעורך | PRIME news</title>
-  <!-- ייבוא פונטים מודרניים לעברית (Heebo & Assistant) -->
-  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Heebo:wght@500;700;800&display=swap" rel="stylesheet">
-  <style>
-    :root {
-        --primary-dark: #0B1F3A;     /* כחול כהה - אמינות וסמכות */
-        --accent-red: #C81D25;       /* אדום עמוק - חדשות חמות */
-        --bg-color: #F3F5F7;         /* אפור בהיר - רקע מודרני */
-        --card-bg: #FFFFFF;          /* לבן נקי */
-        --text-main: #1A1A1A;        /* שחור פחם - טקסט ראשי */
-        --text-muted: #64748b;
-        --border-color: #E2E8F0;
-    }
-
-    body { 
-        font-family: 'Assistant', sans-serif; 
-        background-color: var(--bg-color); 
-        color: var(--text-main);
-        margin: 0; 
-        padding: 25px; 
-        direction: rtl; 
-    }
-
-    .container { 
-        max-width: 1100px; 
-        margin: 0 auto; 
-        background: var(--card-bg); 
-        padding: 30px; 
-        border-radius: 14px; 
-        box-shadow: 0 4px 20px rgba(11, 31, 58, 0.06); 
-        border-top: 5px solid var(--primary-dark);
-    }
-
-    .header { 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center; 
-        border-bottom: 2px solid var(--bg-color); 
-        padding-bottom: 20px; 
-        margin-bottom: 25px; 
-    }
-
-    .header h1 { 
-        font-family: 'Heebo', sans-serif;
-        margin: 0; 
-        font-size: 28px; 
-        color: var(--primary-dark);
-        font-weight: 800;
-        letter-spacing: -0.5px;
-    }
-
-    .header h1 span {
-        color: var(--accent-red);
-    }
-
-    .header-actions a, .header-actions button { 
-        margin-right: 10px; 
-        padding: 10px 18px; 
-        border-radius: 8px; 
-        text-decoration: none; 
-        font-size: 14px; 
-        cursor: pointer; 
-        border: 1px solid var(--border-color); 
-        background: #fff; 
-        color: var(--primary-dark); 
-        font-weight: 700;
-        font-family: 'Heebo', sans-serif;
-        transition: all 0.2s;
-    }
-
-    .header-actions a:hover, .header-actions button:hover {
-        background: var(--primary-dark);
-        color: white;
-        border-color: var(--primary-dark);
-    }
-
-    table { 
-        width: 100%; 
-        border-collapse: collapse; 
-        margin-top: 10px; 
-    }
-
-    th, td { 
-        padding: 14px 16px; 
-        border-bottom: 1px solid var(--border-color); 
-        text-align: right; 
-    }
-
-    th { 
-        background: #f8fafc; 
-        font-weight: 700; 
-        color: var(--primary-dark);
-        font-family: 'Heebo', sans-serif;
-        font-size: 15px;
-    }
-
-    .status { 
-        padding: 5px 10px; 
-        border-radius: 6px; 
-        font-size: 12px; 
-        font-weight: 700; 
-        display: inline-block; 
-        font-family: 'Heebo', sans-serif;
-    }
-
-    .status-Pending { background: #fef3c7; color: #b45309; }
-    .status-Published { background: #dcfce7; color: #166534; }
-    .status-Returned { background: #fee2e2; color: #991b1b; }
-
-    .actions { 
-        display: flex; 
-        gap: 8px; 
-        align-items: center; 
-        flex-wrap: wrap; 
-    }
-
-    .btn { 
-        padding: 7px 14px; 
-        border-radius: 6px; 
-        text-decoration: none; 
-        font-size: 13px; 
-        border: none; 
-        cursor: pointer; 
-        font-weight: 700; 
-        font-family: 'Heebo', sans-serif;
-        transition: opacity 0.2s;
-    }
-
-    .btn:hover { opacity: 0.9; }
-    .btn-review { background: var(--primary-dark); color: white; }
-    .btn-analytics { background: #7c3aed; color: white; }
-    .btn-delete { background: var(--accent-red); color: white; }
-    
-    form.inline { display: inline; margin: 0; }
-  </style>
-</head>
-<body>
-  <main class="container">
-    <header class="header">
-      <h1>PRIME <span>NEWS</span> | לוח בקרה לעורך</h1>
-      <div class="header-actions">
-        <a href="/">לעמוד הבית הציבורי</a>
-        <button onclick="logout()">התנתק</button>
-      </div>
-    </header>
-
-    <% if (articles.length === 0) { %>
-      <p style="text-align: center; color: var(--text-muted); padding: 40px; font-size: 16px;">אין כרגע כתבות הממתינות לאישור או כתבות שפורסמו.</p>
-    <% } else { %>
-      <table>
-        <thead>
-          <tr>
-            <th>כותרת</th>
-            <th>כתב</th>
-            <th>קטגוריה</th>
-            <th>סטטוס</th>
-            <th>עודכנה לאחרונה</th>
-            <th>פעולות עורך</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% articles.forEach(a => { const pub = wasPublished(a); %>
-            <tr>
-              <td><strong><%= a.title || '(ללא כותרת)' %></strong></td>
-              <td><%= a.reporter ? a.reporter.username : 'לא ידוע' %></td>
-              <td><%= a.category || '-' %></td>
-              <td>
-                <% if (pub && a.status !== 'Published') { %>
-                  <span class="status status-Published">פורסמה</span>
-                  <small style="margin-right: 5px; color: var(--text-muted);">· עדכון: <span class="status status-<%= a.status %>"><%= STATUS_LABELS[a.status] %></span></small>
-                <% } else { %>
-                  <span class="status status-<%= a.status %>"><%= STATUS_LABELS[a.status] %></span>
-                <% } %>
-              </td>
-              <td><%= a.updatedAt.toLocaleString('he-IL') %></td>
-              <td class="actions">
-                <a class="btn btn-review" href="/editor/articles/<%= a._id %>/review">סקירה ועריכה</a>
-                <a class="btn btn-analytics" href="/editor/articles/<%= a._id %>/analytics">אנליטיקה</a>
-                <form action="/editor/articles/<%= a._id %>/delete" method="POST" class="inline" onsubmit="return confirm('האם אתה בטוח שברצונך למחוק את הכתבה לצמיתות?')">
-                  <button type="submit" class="btn btn-delete">מחיקה</button>
-                </form>
-              </td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
-    <% } %>
-  </main>
-
-  <script>
-    async function logout() {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      window.location.href = '/login';
-    }
-  </script>
-</body>
-</html>
+<%- include('../partials/top', { title: 'מערכת העריכה' }) %>
+<section class="page-heading">
+  <div>
+    <p class="eyebrow">מערכת העריכה</p>
+    <h1>מבט על המערכת<span class="accent">.</span></h1>
+    <p class="lead">כל הסיפורים, מהטיוטה ועד הפרסום.</p>
+  </div><a class="button subtle" href="/">צפייה באתר ↗</a>
+</section>
+<div class="summary-row">
+  <div class="summary-tile"><span>ממתינות להחלטה</span><strong><%= pending %></strong></div>
+  <div class="summary-tile"><span>כתבות בתצוגה הנבחרת</span><strong><%= total %></strong></div>
+  <div class="summary-tile editorial-note"><span>הסיפור הבא</span>
+    <p>דיוק בפרטים.<br>מקום לנקודות מבט.</p>
+  </div>
+</div>
+<section class="panel">
+  <div class="section-title">
+    <h2>כל הכתבות</h2>
+    <form class="actions" method="GET"><label for="status">סינון לפי סטטוס</label><select id="status" name="status">
+        <option value="">כל הסטטוסים</option><% Object.entries(STATUS_LABELS).forEach(([k,v])=>{ %><option
+          value="<%= k %>" <%= selectedStatus===k?'selected':'' %>><%= v %></option><% }) %>
+      </select><button class="button subtle small">סינון</button></form>
+  </div>
+  <% if(!articles.length) { %><p class="empty-state">אין כתבות להצגה בסטטוס זה.</p><% } else { %><div
+    class="table-scroll" tabindex="0" role="region" aria-label="טבלת ניהול כתבות">
+    <table>
+      <thead>
+        <tr>
+          <th>כתבה</th>
+          <th>כתב</th>
+          <th>סטטוס</th>
+          <th>פעולות</th>
+        </tr>
+      </thead>
+      <tbody><% articles.forEach(a=>{ %><tr>
+          <td><strong><%= a.title || 'טיוטה ללא כותרת' %></strong><small><%= categories[a.category] || 'ללא קטגוריה' %>
+              · <%= date(a.updatedAt) %></small></td>
+          <td><%= a.reporter?.username || '—' %></td>
+          <td><span
+              class="badge <%= a.status %>"><%= STATUS_LABELS[a.status] %></span><% if(a.publishedVersion?.publishedAt && a.status!=='Published') { %><small>גרסה
+              מאושרת באוויר</small><% } %></td>
+          <td>
+            <div class="actions"><a class="button subtle small" href="/editor/articles/<%= a._id %>/review">בדיקת כתבה
+                ←</a><a class="text-button" href="/editor/articles/<%= a._id %>/analytics">נתוני צפייה</a></div>
+          </td>
+        </tr><% }) %></tbody>
+    </table>
+  </div><% } %>
+  <nav class="pagination" aria-label="דפדוף בכתבות"><% if(page>1) { %><a class="button subtle"
+      href="?page=<%= page-1 %>&status=<%= selectedStatus %>">הקודם</a><% } %><span>עמוד <%= page %> מתוך
+      <%= Math.max(1,pages) %></span><% if(page<pages) { %><a class="button subtle"
+      href="?page=<%= page+1 %>&status=<%= selectedStatus %>">הבא</a><% } %></nav>
+</section>
+<%- include('../partials/bottom') %>

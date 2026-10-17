@@ -595,3 +595,57 @@ test("a signed but malformed identity is treated as unauthenticated", async () =
   );
   assert.equal((await client.request("/api/users")).status, 401);
 });
+
+
+test("image uploads enforce ownership, CSRF, type and size; published snapshots remain isolated", async () => {
+  const reporter = await new Client().login("Reporter1");
+  const other = await new Client().login("Reporter2");
+  const owner = await User.findOne({ username: "Reporter1" });
+  const article = await Article.create({ reporter: owner._id, status: "Draft" });
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=", "base64");
+  async function upload(client, bytes, csrf = true) {
+    const form = new FormData();
+    form.append("image", new Blob([bytes], { type: "image/png" }), "sample.png");
+    const headers = { Cookie: Object.entries(client.cookies).map(([k,v]) => `${k}=${v}`).join("; ") };
+    if(csrf) headers["X-CSRF-Token"] = client.csrf;
+    return fetch(`${base}/reporter/articles/${article._id}/image`, { method: "POST", headers, body: form });
+  }
+  assert.equal((await upload(other, png)).status, 404);
+  assert.equal((await upload(reporter, png, false)).status, 403);
+  assert.equal((await upload(reporter, Buffer.from("<svg onload=alert(1)>"))).status, 400);
+  assert.equal((await upload(reporter, Buffer.alloc(3 * 1024 * 1024 + 1))).status, 413);
+  const response = await upload(reporter, png);
+  assert.equal(response.status, 201);
+  const { url } = await response.json();
+  assert.match(url, /^\/uploads\/[a-f0-9]{32}\.png$/);
+  try {
+    const image = await fetch(base + url);
+    assert.equal(image.status, 200);
+    assert.equal(image.headers.get("content-type"), "image/png");
+    assert.deepEqual(Buffer.from(await image.arrayBuffer()), png);
+    const service = require("../services/articles");
+    service.applyValues(article, { title: "Upload example", category: "Technology", content: "Original", mainImage: url });
+    article.status = "Pending";
+    await service.publish(article);
+    const guest = new Client();
+    const html = await guest.request(`/api/articles/view/${article._id}`);
+    assert.equal(html.status, 200);
+    assert.ok(html.text.includes(`src="${url}"`));
+    assert.ok(html.text.includes('property="og:title"'));
+    const second = await upload(reporter, png);
+    assert.equal(second.status, 201); // Published articles may start an update.
+    const secondUrl = (await second.json()).url;
+    await require("node:fs/promises").unlink(require("node:path").join(__dirname, "..", "public", secondUrl));
+    article.status = "Draft";
+    service.applyValues(article, { mainImage: "" });
+    await article.save();
+    assert.equal((await Article.findById(article._id)).publishedVersion.mainImage, url);
+    article.status = "Pending";
+    article.mainImage = url;
+    await article.save();
+    assert.equal((await upload(reporter, png)).status, 409);
+  } finally {
+    await require("node:fs/promises").unlink(require("node:path").join(__dirname, "..", "public", url));
+    await require("../services/articles").remove(article._id);
+  }
+});

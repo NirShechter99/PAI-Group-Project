@@ -144,3 +144,6 @@ vite.config.ts.timestamp-*
 .vs/
 # Generated visual QA output (regenerate with npm run test:browser).
 docs/screenshots/
+
+# Runtime uploads are not source code
+public/uploads/
