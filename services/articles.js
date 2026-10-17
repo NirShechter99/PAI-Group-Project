@@ -27,7 +27,7 @@ function applyValues(article, body) {
         key === "content" ? 50000 : key === "mainImage" ? 2000 : 300,
       );
     }
-  if (article.category && !categories[article.category])
+  if (article.category && !Object.hasOwn(categories, article.category))
     throw Object.assign(new Error("Invalid category"), { status: 400 });
   if (
     article.mainImage &&
