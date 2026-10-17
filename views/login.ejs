@@ -3,38 +3,173 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>התחברות למערכת | The Daily Web</title>
+  <title>התחברות למערכת | PRIME news</title>
+  <!-- ייבוא פונטים מודרניים לעברית (Heebo & Assistant) -->
+  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Heebo:wght@500;700;800&display=swap" rel="stylesheet">
   <style>
-    body { font-family: Arial, sans-serif; background: #f4f6f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-    .login-card { background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 380px; }
-    h1 { margin-top: 0; font-size: 24px; text-align: center; color: #333; }
-    .form-group { margin-bottom: 15px; }
-    label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
-    input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-    button { width: 100%; padding: 10px; background: #1a73e8; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; font-weight: bold; }
-    button:hover { background: #1558b0; }
-    .error-msg { color: #d93025; background: #fce8e6; padding: 10px; border-radius: 4px; display: none; margin-bottom: 15px; text-align: center; }
-    .links { margin-top: 15px; text-align: center; font-size: 14px; }
-    .links a { color: #1a73e8; text-decoration: none; }
+    :root {
+        --primary-dark: #0B1F3A;     /* כחול כהה - אמינות וסמכות */
+        --accent-red: #C81D25;       /* אדום עמוק - חדשות חמות */
+        --bg-color: #F3F5F7;         /* אפור בהיר - רקע מודרני */
+        --card-bg: #FFFFFF;          /* לבן נקי */
+        --text-main: #1A1A1A;        /* שחור פחם - טקסט ראשי */
+        --text-muted: #64748b;
+        --border-color: #E2E8F0;
+    }
+
+    body { 
+        font-family: 'Assistant', sans-serif; 
+        background-color: var(--bg-color); 
+        color: var(--text-main);
+        display: flex; 
+        justify-content: center; 
+        align-items: center; 
+        height: 100vh; 
+        margin: 0; 
+        direction: rtl; 
+    }
+
+    .login-card { 
+        background: var(--card-bg); 
+        padding: 40px 30px; 
+        border-radius: 14px; 
+        box-shadow: 0 4px 20px rgba(11, 31, 58, 0.08); 
+        width: 100%; 
+        max-width: 400px;
+        border-top: 5px solid var(--primary-dark);
+        box-sizing: border-box;
+    }
+
+    .brand-header {
+        text-align: center;
+        margin-bottom: 25px;
+    }
+
+    h1 { 
+        font-family: 'Heebo', sans-serif;
+        margin: 0 0 5px 0; 
+        font-size: 28px; 
+        color: var(--primary-dark);
+        font-weight: 800;
+        letter-spacing: -0.5px;
+    }
+
+    h1 span {
+        color: var(--accent-red);
+    }
+
+    .subtitle {
+        margin: 0;
+        font-size: 14px;
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+
+    .form-group { 
+        margin-bottom: 20px; 
+    }
+
+    label { 
+        display: block; 
+        margin-bottom: 8px; 
+        font-weight: 700; 
+        color: var(--text-main); 
+        font-size: 14px;
+        font-family: 'Heebo', sans-serif;
+    }
+
+    input { 
+        width: 100%; 
+        padding: 12px 14px; 
+        border: 1px solid var(--border-color); 
+        border-radius: 8px; 
+        box-sizing: border-box; 
+        font-size: 15px;
+        font-family: 'Assistant', sans-serif;
+        outline: none;
+        transition: border-color 0.2s;
+        background-color: #fafafa;
+    }
+
+    input:focus {
+        border-color: var(--primary-dark);
+        background-color: #fff;
+    }
+
+    button[type="submit"] { 
+        width: 100%; 
+        padding: 13px; 
+        background: var(--primary-dark); 
+        color: white; 
+        border: none; 
+        border-radius: 8px; 
+        font-size: 16px; 
+        cursor: pointer; 
+        font-weight: 700; 
+        font-family: 'Heebo', sans-serif;
+        box-shadow: 0 2px 6px rgba(11, 31, 58, 0.2);
+        transition: background-color 0.2s, transform 0.1s;
+        margin-top: 5px;
+    }
+
+    button[type="submit"]:hover { 
+        background: var(--accent-red); 
+    }
+
+    .error-msg { 
+        color: #d93025; 
+        background: #fce8e6; 
+        padding: 10px; 
+        border-radius: 6px; 
+        display: none; 
+        margin-bottom: 20px; 
+        text-align: center; 
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .links { 
+        margin-top: 25px; 
+        text-align: center; 
+        font-size: 14px; 
+    }
+
+    .links a { 
+        color: var(--primary-dark); 
+        text-decoration: none; 
+        font-weight: 600;
+        transition: color 0.2s;
+    }
+
+    .links a:hover { 
+        color: var(--accent-red);
+        text-decoration: underline; 
+    }
   </style>
 </head>
 <body>
   <main class="login-card">
-    <h1>התחברות לצוות</h1>
+    <div class="brand-header">
+        <h1>PRIME <span>NEWS</span></h1>
+        <p class="subtitle">להיות ראשונים, להבין לעומק</p>
+    </div>
+
     <div id="errorBox" class="error-msg"></div>
+    
     <form id="loginForm">
       <div class="form-group">
         <label for="username">שם משתמש</label>
-        <input type="text" id="username" name="username" required autocomplete="username">
+        <input type="text" id="username" name="username" required autocomplete="username" placeholder="הכנס שם משתמש...">
       </div>
       <div class="form-group">
         <label for="password">סיסמה</label>
-        <input type="password" id="password" name="password" required autocomplete="current-password">
+        <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="הכנס סיסמה...">
       </div>
-      <button type="submit">התחבר</button>
+      <button type="submit">התחבר למערכת</button>
     </form>
+    
     <div class="links">
-      <a href="/">חזרה לעמוד הבית הציבורי</a>
+      <a href="/">← חזרה לעמוד הבית הציבורי</a>
     </div>
   </main>
 

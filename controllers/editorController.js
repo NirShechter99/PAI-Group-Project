@@ -18,9 +18,7 @@ function wasPublished(article) {
 exports.dashboard = async (req, res) => {
     try {
         // מציג כתבות שממתינות לאישור או שפורסמו, מהחדש לישן
-        const articles = await Article.find({ status: { \$in: ['Pending', 'Published', 'Returned'] } })
-            .populate('reporter', 'username')
-            .sort({ updatedAt: -1 });
+        const articles = await Article.find({ status: { $in: ['Pending', 'Published', 'Returned'] } }).populate('reporter', 'username').sort({ updatedAt: -1 });
 
         res.render('editor/dashboard', { articles, STATUS_LABELS, wasPublished });
     } catch (error) {

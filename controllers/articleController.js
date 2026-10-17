@@ -158,23 +158,51 @@ exports.publishArticle = async (req, res) => {
     }
 };
 
-// Get only published articles for the public homepage (Guests) with Pagination
+// Get only published articles for the public homepage with search, filter, sort, and pagination
 exports.getPublicArticles = async (req, res) => {
     try {
-        // קליטת מספר העמוד והכמות מתוך ה-Query Parameters (ברירת מחדל: עמוד 1, 5 כתבות בעמוד)
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 5;
         const skip = (page - 1) * limit;
 
-        // שליפת הכתבות המפורסמות עם מדלג (skip) ומגבלה (limit)
-        const articles = await Article.find(PUBLIC_FILTER)
+        // מתחילים עם הפילטר הקבוצתי המוגדר מראש (Published)
+        let query = { ...PUBLIC_FILTER };
+
+        // 1. חיפוש טקסטואלי (כותרת או תוכן)
+        if (req.query.search) {
+            const searchRegex = new RegExp(req.query.search, 'i');
+            query.$or = [
+                { title: searchRegex },
+                { content: searchRegex },
+                { 'publishedVersion.title': searchRegex },
+                { 'publishedVersion.content': searchRegex }
+            ];
+        }
+
+        // 2. סינון לפי קטגוריה
+        if (req.query.category && req.query.category !== 'all') {
+            query.$or = [
+                { category: req.query.category },
+                { 'publishedVersion.category': req.query.category }
+            ];
+        }
+
+        // 3. הגדרת מיון (Sort)
+        let sortOption = { 'publishedVersion.publishedAt': -1 }; // ברירת מחדל: חדש לישן
+        if (req.query.sort === 'oldest') {
+            sortOption = { 'publishedVersion.publishedAt': 1 };
+        } else if (req.query.sort === 'popular') {
+            sortOption = { views: -1 };
+        }
+
+        // שליפת הכתבות מהמסד לפי כל התנאים
+        const articles = await Article.find(query)
             .populate('reporter', 'username')
-            .sort({ 'publishedVersion.publishedAt': -1 }) // מהחדש ישן
+            .sort(sortOption)
             .skip(skip)
             .limit(limit);
 
-        // ספירת סך הכל הכתבות המפורסמות לצורך בקרה
-        const totalArticles = await Article.countDocuments(PUBLIC_FILTER);
+        const totalArticles = await Article.countDocuments(query);
 
         res.status(200).json({
             message: 'Public articles fetched successfully',
@@ -185,7 +213,7 @@ exports.getPublicArticles = async (req, res) => {
             articles: articles.map(toPublicArticle)
         });
     } catch (error) {
-        logger.logError('Error fetching public articles', error);
+        logger.logError('Error fetching public articles with filters', error);
         
         res.status(500).json({ 
             message: 'Error fetching public articles', 

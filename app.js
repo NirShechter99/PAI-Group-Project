@@ -1,6 +1,7 @@
 const logger = require('./utils/logger');
 const express = require('express');
 const mongoose = require('mongoose');
+const bcrypt = require('bcrypt'); // נוסף לצורך יצירת סיסמאות מוצפנות למשתמשים
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -48,29 +49,58 @@ app.get('/login', (req, res) => res.render('login'));
 
 const MONGO_URI = 'mongodb+srv://nir:passwordtest123@cluster0.hwi3ljx.mongodb.net/?appName=Cluster0';
 
+// ייבוא מודל המשתמש והכתבות
+const User = require('./models/User');
+const Article = require('./models/Article');
+const { PUBLIC_FILTER, toPublicArticle } = require('./utils/publicArticle');
+
 mongoose.connect(MONGO_URI)
-    .then(() => {
+    .then(async () => {
         const msg = 'Connected to MongoDB successfully';
         console.log(msg);
         logger.logEvent(msg); // Log operational event
+
+        // יצירה אוטומטית של משתמשי בדיקה קבועים לנוחות ההתחברות למערכת
+        try {
+            const hashedPassword = await bcrypt.hash('123456', 10);
+            
+            // בדיקה ויצירה של עורך ראשי
+            const editorExists = await User.findOne({ username: 'MainEditor' });
+            if (!editorExists) {
+                await User.create({
+                    username: 'MainEditor',
+                    password: hashedPassword,
+                    role: 'Editor'
+                });
+                console.log('Default Editor created -> Username: MainEditor | Password: 123456');
+            }
+
+            // בדיקה ויצירה של כתב קבוע
+            const reporterExists = await User.findOne({ username: 'reporter1' });
+            if (!reporterExists) {
+                await User.create({
+                    username: 'reporter1',
+                    password: hashedPassword,
+                    role: 'Reporter'
+                });
+                console.log('Default Reporter created -> Username: reporter1 | Password: 123456');
+            }
+        } catch (err) {
+            console.error('Error ensuring default users:', err);
+        }
     })
     .catch((err) => {
         console.error('MongoDB connection error:', err);
         logger.logError('Failed to connect to MongoDB', err); // Log error
     });
 
-    // ייבוא מודל הכתבות במידת הצורך עבור דף הבית
-const Article = require('./models/Article');
-const { PUBLIC_FILTER, toPublicArticle } = require('./utils/publicArticle');
-
-// Route for the homepage news feed (Server-Side Rendering for SEO)
+// Route for the homepage news feed (Server-Side Rendering for SEO & Infinite Scroll)
 app.get('/', async (req, res) => {
     try {
-        // שליפת 5 הכתבות הראשונות המפורסמות לצורך הצגה ראשונית בדף הבית
+        // שליפת כל הכתבות המפורסמות לצורך תצוגה, סינון וגלילה אינסופית חלקה בדף הבית
         const articles = await Article.find(PUBLIC_FILTER)
             .populate('reporter', 'username')
-            .sort({ 'publishedVersion.publishedAt': -1 })
-            .limit(5);
+            .sort({ 'publishedVersion.publishedAt': -1 });
 
         res.render('index', { articles: articles.map(toPublicArticle) });
     } catch (err) {
@@ -80,8 +110,8 @@ app.get('/', async (req, res) => {
 });
 
 // Example of logging the server start
-app.listen(3000, () => {
-    const msg = 'Server is running on port 3000';
+app.listen(PORT, () => {
+    const msg = `Server is running on port ${PORT}`;
     console.log(msg);
     logger.logEvent(msg); // Log operational event
 });
