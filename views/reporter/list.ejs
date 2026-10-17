@@ -1,51 +1,55 @@
-<!DOCTYPE html>
-<html lang="he" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>הכתבות שלי</title>
-</head>
-<body>
-  <main class="reporter-area">
-    <header class="reporter-header">
-      <h1>הכתבות שלי</h1>
-      <a class="btn" href="/reporter/articles/new">+ כתבה חדשה</a>
-    </header>
-
-    <% if (articles.length === 0) { %>
-      <p>עדיין אין לך כתבות.</p>
-    <% } else { %>
-      <table class="articles-table">
-        <thead>
-          <tr><th>כותרת</th><th>סטטוס</th><th>עודכנה</th><th>פעולות</th></tr>
-        </thead>
-        <tbody>
-          <% articles.forEach(a => { const pub = wasPublished(a); %>
-            <tr>
-              <td><%= a.title || '(ללא כותרת)' %></td>
-              <td>
-                <% if (pub && a.status !== 'Published') { %>
-                  <span class="status status-Published">פורסמה</span>
-                  <small>· עדכון: <%= STATUS_LABELS[a.status] %></small>
-                <% } else { %>
-                  <span class="status status-<%= a.status %>"><%= STATUS_LABELS[a.status] %></span>
-                <% } %>
-              </td>
-              <td><%= a.updatedAt.toLocaleString('he-IL') %></td>
-              <td>
-                <a href="/reporter/articles/<%= a._id %>/edit"><%= a.status === 'Pending' ? 'צפייה' : 'עריכה' %></a>
-                <% if (['Draft', 'Returned'].includes(a.status) && !pub) { %>
-                  <form action="/reporter/articles/<%= a._id %>/delete" method="POST" class="inline"
-                        onsubmit="return confirm('למחוק את הטיוטה?')">
-                    <button type="submit" class="link-danger">מחיקה</button>
-                  </form>
-                <% } %>
-              </td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
-    <% } %>
-  </main>
-</body>
-</html>
+<%- include('../partials/top', { title: 'סביבת הכתב' }) %>
+<section class="page-heading">
+  <div>
+    <p class="eyebrow">סביבת הכתב</p>
+    <h1>הסיפורים שלך<span class="accent">.</span></h1>
+    <p class="lead">מרעיון חדש ועד כתבה שכולם קוראים.</p>
+  </div>
+  <form action="/reporter/articles/new" method="POST"><input type="hidden" name="_csrf" value="<%= csrf %>"><button
+      class="button" type="submit">+ כתבה חדשה</button></form>
+</section>
+<div class="summary-row">
+  <div class="summary-tile"><span>כל הכתבות שלי</span><strong><%= articles.length %></strong></div>
+  <div class="summary-tile">
+    <span>בעבודה</span><strong><%= articles.filter(a => ['Draft','Returned'].includes(a.status)).length %></strong>
+  </div>
+  <div class="summary-tile"><span>ממתינות
+      לאישור</span><strong><%= articles.filter(a => a.status==='Pending').length %></strong></div>
+</div>
+<section class="panel">
+  <div class="section-title">
+    <h2>שולחן העבודה</h2><span>הכתבות האחרונות שלך</span>
+  </div><% if (!articles.length) { %><div class="empty-state">
+    <h2>כאן יתחיל הסיפור הראשון שלך</h2>
+    <p>לחצו על ״כתבה חדשה״ כדי להתחיל.</p>
+  </div><% } else { %><div class="table-scroll" tabindex="0" role="region" aria-label="טבלת הכתבות שלי">
+    <table>
+      <thead>
+        <tr>
+          <th>כתבה</th>
+          <th>סטטוס</th>
+          <th>עדכון אחרון</th>
+          <th>פעולות</th>
+        </tr>
+      </thead>
+      <tbody><% articles.forEach(a => { const pub=wasPublished(a); %><tr>
+          <td>
+            <strong><%= a.title || 'טיוטה ללא כותרת' %></strong><small><%= categories[a.category] || 'ללא קטגוריה' %></small>
+          </td>
+          <td><span
+              class="badge <%= a.status %>"><%= STATUS_LABELS[a.status] %></span><% if(pub && a.status!=='Published') { %><small>הגרסה
+              המאושרת באוויר</small><% } %></td>
+          <td><%= date(a.updatedAt) %></td>
+          <td>
+            <div class="actions"><a class="button subtle small"
+                href="/reporter/articles/<%= a._id %>/edit"><%= a.status==='Pending' ? 'צפייה' : 'עריכה' %>
+                ←</a><% if(['Draft','Returned'].includes(a.status) && !pub) { %><form
+                action="/reporter/articles/<%= a._id %>/delete" method="POST" data-confirm="למחוק את הטיוטה?"><input
+                  type="hidden" name="_csrf" value="<%= csrf %>"><button class="text-button danger">מחיקה</button>
+              </form><% } %></div>
+          </td>
+        </tr><% }) %></tbody>
+    </table>
+  </div><% } %>
+</section>
+<%- include('../partials/bottom') %>
