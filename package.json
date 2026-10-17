@@ -1,10 +1,16 @@
 {
   "name": "pai-group-project",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "The Daily Web \u2014 academic MVC news application",
+  "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node app.js",
+    "dev": "node --watch app.js",
+    "seed": "node scripts/seed.js",
+    "test": "node --test test/*.test.js",
+    "check": "node scripts/check.js",
+    "test:browser": "node test/browser-smoke.js",
+    "preflight": "node scripts/preflight.js"
   },
   "repository": {
     "type": "git",
@@ -19,7 +25,6 @@
   },
   "homepage": "https://github.com/NirShechter99/PAI-Group-Project#readme",
   "dependencies": {
-    "@faker-js/faker": "^10.6.0",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "ejs": "^6.0.1",

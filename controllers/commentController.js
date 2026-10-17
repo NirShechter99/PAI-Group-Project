@@ -1,7 +1,13 @@
-const Comment = require('../models/Comment');
-const logger = require('../utils/logger');
-
-// Create a new comment with anti-spam protection (Max 3 per minute per IP)
+const Comment = require("../models/Comment");
+const Article = require("../models/Article");
+const reserve = require("../services/rateLimit");
+const { PUBLIC_FILTER } = require("../utils/publicArticle");
+const publicComment = (c) => ({
+  _id: c._id,
+  authorName: c.authorName,
+  content: c.content,
+  createdAt: c.createdAt,
+});
 exports.createComment = async (req, res) => {
     try {
         // תמיכה בשני שמות השדה (article או articleId) למניעת שגיאות ולידציה
@@ -47,8 +53,6 @@ exports.createComment = async (req, res) => {
         });
     }
 };
-
-// Get all comments for a specific article (CRUD: Read)
 exports.getCommentsByArticle = async (req, res) => {
     try {
         const articleId = req.params.articleId;
@@ -67,31 +71,22 @@ exports.getCommentsByArticle = async (req, res) => {
         });
     }
 };
-
-// Update an existing comment (CRUD: Update)
 exports.updateComment = async (req, res) => {
-    try {
-        const updatedComment = await Comment.findByIdAndUpdate(
-            req.params.id, 
-            req.body, 
-            { new: true, runValidators: true }
-        );
-        if (!updatedComment) return res.status(404).json({ message: 'Comment not found' });
-        res.status(200).json({ message: 'Comment updated', comment: updatedComment });
-    } catch (error) {
-        logger.logError('Error updating comment', error);
-        res.status(500).json({ message: 'Error updating comment', error: error.message });
-    }
+  if (
+    typeof req.body.content !== "string" ||
+    !req.body.content.trim() ||
+    req.body.content.length > 2000
+  )
+    return res.status(400).json({ message: "תגובה לא תקינה" });
+  const comment = await Comment.findByIdAndUpdate(
+    req.params.id,
+    { content: req.body.content.trim() },
+    { returnDocument: "after", runValidators: true },
+  );
+  if (!comment) return res.status(404).json({ message: "הפריט לא נמצא" });
+  res.json({ comment: publicComment(comment) });
 };
-
-// Delete a comment (CRUD: Delete)
 exports.deleteComment = async (req, res) => {
-    try {
-        const deletedComment = await Comment.findByIdAndDelete(req.params.id);
-        if (!deletedComment) return res.status(404).json({ message: 'Comment not found' });
-        res.status(200).json({ message: 'Comment deleted successfully' });
-    } catch (error) {
-        logger.logError('Error deleting comment', error);
-        res.status(500).json({ message: 'Error deleting comment', error: error.message });
-    }
+  await Comment.findByIdAndDelete(req.params.id);
+  res.json({ ok: true });
 };

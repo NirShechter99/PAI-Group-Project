@@ -101,6 +101,8 @@ exports.requireEditor = (req, res, next) => {
             </html>
         `);
     }
+  }
+  next();
 };
 
 // Middleware to restrict access to Reporters or Editors

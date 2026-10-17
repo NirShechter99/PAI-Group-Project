@@ -1,81 +1,138 @@
-// Work continuity: the draft is saved in the background, nothing is lost on refresh or when the browser closes.
-// Three layers of protection:
-//   1. localStorage: saved instantly on every keystroke (works even offline)
-//   2. fetch to the server: 1.5 seconds after the reporter stops typing, plus a retry every 10 seconds
-//   3. sendBeacon: a last save when the page is closed or refreshed
-(function () {
-  const form = document.getElementById('article-form');
-  if (!form || form.dataset.locked === 'true') return;
-
-  const url = `/reporter/articles/${form.dataset.articleId}/autosave`;
-  const storageKey = `article-draft-${form.dataset.articleId}`;
-  const statusEl = document.getElementById('save-status');
-  const FIELDS = ['title', 'category', 'mainImage', 'content'];
-
-  let timer = null;
-  let dirty = false;
-
-  const getData = () => Object.fromEntries(FIELDS.map((f) => [f, form.elements[f].value]));
-  const setStatus = (text) => { statusEl.textContent = text; };
-
-  function saveLocal() {
-    try { localStorage.setItem(storageKey, JSON.stringify({ savedAt: Date.now(), data: getData() })); } catch (e) {}
-  }
-
-  function clearLocal() {
-    try { localStorage.removeItem(storageKey); } catch (e) {}
-  }
-
-  async function saveToServer() {
-    if (!dirty) return;
-    setStatus('שומר...');
+// Logical revisions order keystrokes independently of network arrival or clock skew.
+(() => {
+  const form = document.getElementById("article-form");
+  if (!form || form.dataset.locked === "true") return;
+  const fields = ["title", "category", "mainImage", "content"];
+  const key = `draft-${form.dataset.userId}-${form.dataset.articleId}`;
+  const status = document.getElementById("save-status");
+  let revision = Number(form.dataset.draftClock) || 0;
+  let savedRevision = revision,
+    pending = null,
+    timer,
+    submitting = false;
+  const data = () =>
+    Object.fromEntries(fields.map((f) => [f, form.elements[f].value]));
+  const clear = () => {
     try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(getData())
-      });
-      if (res.status === 409) return setStatus('הכתבה אצל העורך, לא ניתן לשמור שינויים');
-      if (res.status === 401) return setStatus('נותקת מהמערכת. הטיוטה שמורה במחשב שלך, התחברי מחדש');
-      if (!res.ok) throw new Error(res.status);
-      const { savedAt } = await res.json();
-      dirty = false;
-      clearLocal();
-      setStatus('נשמר אוטומטית ב ' + new Date(savedAt).toLocaleTimeString('he-IL'));
-    } catch (e) {
-      setStatus('אין חיבור לשרת. הטיוטה שמורה במחשב שלך ותישלח שוב');
-    }
+      localStorage.removeItem(key);
+    } catch {}
+  };
+  function backup() {
+    try {
+      localStorage.setItem(
+        key,
+        JSON.stringify({ clock: revision, data: data() }),
+      );
+    } catch {}
   }
-
-  // Restore from localStorage if it is newer than what the server has
+  async function save() {
+    if (pending) return pending;
+    if (revision === savedRevision) return;
+    const snapshot = revision,
+      values = data();
+    status.textContent = "שומר…";
+    pending = (async () => {
+      try {
+        const result = await api(
+          `/reporter/articles/${form.dataset.articleId}/autosave`,
+          {
+            method: "POST",
+            body: JSON.stringify({ ...values, draftClock: snapshot }),
+          },
+        );
+        savedRevision = snapshot;
+        if (revision === snapshot) {
+          clear();
+          status.textContent = `נשמר ב־${formatDate(result.savedAt)}`;
+        } else status.textContent = "שומר את השינויים האחרונים…";
+      } catch (error) {
+        status.textContent =
+          error.status === 401
+            ? "יש להתחבר מחדש. הטיוטה שמורה במכשיר."
+            : error.status === 409
+              ? "קיימת גרסה חדשה בשרת. רעננו כדי להמשיך; הגיבוי המקומי נשמר."
+              : "השמירה לא הושלמה. הטיוטה נשמרת במכשיר וננסה שוב.";
+      } finally {
+        pending = null;
+      }
+    })();
+    return pending;
+  }
+  function restore(local) {
+    fields.forEach((f) => {
+      if (typeof local.data[f] === "string")
+        form.elements[f].value = local.data[f];
+    });
+    revision = Math.max(revision, Number(local.clock) || 0) + 1;
+    backup();
+    save();
+  }
   try {
-    const local = JSON.parse(localStorage.getItem(storageKey) || 'null');
-    const serverTime = form.dataset.serverSavedAt ? new Date(form.dataset.serverSavedAt).getTime() : 0;
-    if (local && local.savedAt > serverTime) {
-      FIELDS.forEach((f) => { if (local.data[f] !== undefined) form.elements[f].value = local.data[f]; });
-      setStatus('שוחזרה טיוטה שלא הספיקה להישמר בשרת');
-      dirty = true;
-      saveToServer();
+    const local = JSON.parse(localStorage.getItem(key) || "null");
+    if (local?.data) {
+      const identical = fields.every(
+        (f) => local.data[f] === form.elements[f].value,
+      );
+      if (identical) clear();
+      else if (Number(local.clock) > revision) restore(local);
+      else {
+        // Never silently replace an editor's or another computer's newer version.
+        status.textContent =
+          "קיים גיבוי מקומי שונה. הגרסה העדכנית מהשרת מוצגת.";
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "button subtle";
+        button.textContent = "שחזור הגיבוי המקומי";
+        button.addEventListener("click", () => {
+          restore(local);
+          button.remove();
+        });
+        status.after(button);
+      }
     }
-  } catch (e) {}
-
-  // Every change: save locally now, save to the server after a short pause
-  FIELDS.forEach((f) => form.elements[f].addEventListener('input', () => {
-    dirty = true;
-    saveLocal();
-    clearTimeout(timer);
-    timer = setTimeout(saveToServer, 1500);
-  }));
-
-  // Safety net: retry every 10 seconds if something was not saved
-  setInterval(saveToServer, 10000);
-
-  // Last save when leaving the page
-  window.addEventListener('pagehide', () => {
-    if (!dirty) return;
-    navigator.sendBeacon(url, new Blob([JSON.stringify(getData())], { type: 'application/json' }));
+  } catch {}
+  fields.forEach((f) =>
+    form.elements[f].addEventListener("input", () => {
+      revision++;
+      backup();
+      clearTimeout(timer);
+      timer = setTimeout(save, 700);
+    }),
+  );
+  setInterval(() => {
+    if (!submitting) save();
+  }, 5000);
+  function beacon() {
+    if (revision !== savedRevision && !submitting)
+      navigator.sendBeacon(
+        `/reporter/articles/${form.dataset.articleId}/autosave`,
+        new Blob(
+          [
+            JSON.stringify({
+              ...data(),
+              draftClock: revision,
+              _csrf: csrfToken(),
+            }),
+          ],
+          { type: "application/json" },
+        ),
+      );
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) beacon();
   });
-
-  // When the form is submitted the server gets everything, no backup needed
-  form.addEventListener('submit', () => { dirty = false; clearLocal(); });
+  window.addEventListener("pagehide", beacon);
+  form.addEventListener("submit", async (event) => {
+    if (submitting) return;
+    const submitter = event.submitter;
+    clearTimeout(timer);
+    if (!pending && revision === savedRevision) {
+      submitting = true;
+      return;
+    }
+    event.preventDefault();
+    await save();
+    submitting = true;
+    setTimeout(() => form.requestSubmit(submitter), 0);
+  });
 })();
