@@ -1,66 +1,45 @@
-const User = require('../models/User');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const logger = require('../utils/logger');
-
-const JWT_SECRET = 'TheDailyWeb_SecretKey_2026';
-
-// Login a user and create a session
+const User = require("../models/User");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const { createHash } = require("node:crypto");
+const { jwtSecret } = require("../config");
+const { cookieOptions } = require("../middleware/requestSecurity");
+const reserve = require("../services/rateLimit");
 exports.login = async (req, res) => {
-    try {
-        const { username, password } = req.body;
-
-        // 1. Check if user exists
-        const user = await User.findOne({ username: username });
-        if (!user) {
-            return res.status(401).json({ message: 'Invalid username or password' });
-        }
-
-        // 2. Compare the provided password with the hashed password in DB
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(401).json({ message: 'Invalid username or password' });
-        }
-
-        // 3. Generate a JWT token including the user's ID and Role
-        const token = jwt.sign(
-            { userId: user._id, role: user.role }, 
-            JWT_SECRET, 
-            { expiresIn: '24h' } // Token expires in 24 hours
-        );
-
-        // 4. Send the token in an HTTP-only Cookie
-        res.cookie('token', token, {
-            httpOnly: true, // Prevents client-side JS from reading the cookie (XSS protection)
-            maxAge: 24 * 60 * 60 * 1000 // 24 hours in milliseconds
-        });
-
-        res.status(200).json({
-            message: 'Logged in successfully',
-            user: {
-                id: user._id,
-                username: user.username,
-                role: user.role
-            }
-        });
-
-    } catch (error) {
-        logger.logError('Error during user login', error);
-
-        res.status(500).json({ 
-            message: 'Error during login', 
-            error: error.message 
-        });
-    }
+  const { username, password } = req.body;
+  if (
+    typeof username !== "string" ||
+    typeof password !== "string" ||
+    password.length > 128
+  )
+    return res.status(400).json({ message: "יש להזין שם משתמש וסיסמה" });
+  const key = createHash("sha256")
+    .update(req.ip || "")
+    .digest("hex");
+  if (!(await reserve(`login:${key}`, 20, 60000)))
+    return res
+      .status(429)
+      .json({ message: "יותר מדי ניסיונות. נסו שוב בעוד דקה." });
+  const user = await User.findOne({ username: username.trim() });
+  if (!user || !(await bcrypt.compare(password, user.password)))
+    return res.status(401).json({ message: "שם משתמש או סיסמה שגויים" });
+  const token = jwt.sign(
+    { userId: user._id, version: user.tokenVersion || 0 },
+    jwtSecret,
+    { algorithm: "HS256", expiresIn: "24h" },
+  );
+  res.cookie("token", token, { ...cookieOptions, maxAge: 86400000 });
+  res.json({
+    message: "התחברת בהצלחה",
+    user: { id: user._id, username: user.username, role: user.role },
+  });
 };
-
-// Logout a user by clearing the cookie
 exports.logout = async (req, res) => {
-    try {
-        res.clearCookie('token');
-        res.status(200).json({ message: 'Logged out successfully' });
-    } catch (error) {
-        logger.logError('Error during user logout', error);
-        res.status(500).json({ message: 'Error during logout', error: error.message });
-    }
+  if (req.user)
+    await User.updateOne(
+      { _id: req.user.userId },
+      { $inc: { tokenVersion: 1 } },
+    );
+  res.clearCookie("token", cookieOptions);
+  res.json({ message: "התנתקת בהצלחה" });
 };

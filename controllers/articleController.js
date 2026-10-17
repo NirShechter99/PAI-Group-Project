@@ -1,195 +1,46 @@
-const Article = require('../models/Article');
-const logger = require('../utils/logger');
-const { PUBLIC_FILTER, toPublicArticle } = require('../utils/publicArticle');
-
-// Create a new article (CRUD: Create)
+const Article = require("../models/Article");
+const User = require("../models/User");
+const service = require("../services/articles");
 exports.createArticle = async (req, res) => {
-    try {
-        const { title, reporter, category, mainImage, content } = req.body;
-
-        // Create a new Article instance
-        const newArticle = new Article({
-            title: title,
-            reporter: reporter,
-            category: category,
-            mainImage: mainImage,
-            content: content,
-            status: 'Draft' // New articles always start as draft
-        });
-
-        // Save the article to the database
-        const savedArticle = await newArticle.save();
-
-        res.status(201).json({
-            message: 'Article created successfully as a draft',
-            article: savedArticle
-        });
-
-    } catch (error) {
-        // Record the error in the logs/errors.log file
-        logger.logError('Error creating article', error);
-
-        res.status(500).json({ 
-            message: 'Error creating article', 
-            error: error.message 
-        });
-    }
+  const reporter =
+    req.user.role === "Reporter" ? req.user.userId : req.body.reporter;
+  if (!(await User.exists({ _id: reporter, role: "Reporter" })))
+    return res.status(400).json({ message: "יש לבחור כתב" });
+  const article = new Article({ reporter, status: "Draft" });
+  service.applyValues(article, req.body);
+  await article.save();
+  res.status(201).json({ article });
 };
-
-// Get all articles (CRUD: Read)
 exports.getArticles = async (req, res) => {
-    try {
-        // Fetch all articles from the database
-        const articles = await Article.find();
-
-        // Send successful response with the articles array
-        res.status(200).json({
-            message: 'Articles fetched successfully',
-            count: articles.length,
-            articles: articles
-        });
-    } catch (error) {
-        logger.logError('Error fetching articles', error);
-
-        // Handle errors without crashing the server
-        res.status(500).json({ 
-            message: 'Error fetching articles', 
-            error: error.message 
-        });
-    }
+  const filter =
+    req.user.role === "Reporter" ? { reporter: req.user.userId } : {};
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const articles = await Article.find(filter)
+    .sort({ updatedAt: -1 })
+    .skip((page - 1) * 20)
+    .limit(20);
+  res.json({ articles });
 };
-
-// Update an existing article (CRUD: Update)
 exports.updateArticle = async (req, res) => {
-    try {
-        // Extract the article ID from the URL parameters
-        const articleId = req.params.id;
-        const updateData = req.body;
-
-        // Find the article by ID and update it with the new data
-        const updatedArticle = await Article.findByIdAndUpdate(
-            articleId,
-            updateData,
-            { new: true, runValidators: true }
-        );
-
-        // If no article matches the given ID
-        if (!updatedArticle) {
-            return res.status(404).json({ message: 'Article not found' });
-        }
-
-        res.status(200).json({
-            message: 'Article updated successfully',
-            article: updatedArticle
-        });
-    } catch (error) {
-        logger.logError('Error updating article', error);
-
-        res.status(500).json({ 
-            message: 'Error updating article', 
-            error: error.message 
-        });
-    }
+  const filter = { _id: req.params.id };
+  if (req.user.role === "Reporter") filter.reporter = req.user.userId;
+  const article = await Article.findOne(filter);
+  if (!article) return res.status(404).json({ message: "כתבה לא נמצאה" });
+  if (req.user.role === "Reporter" && article.status === "Pending")
+    return res.status(409).json({ message: "הכתבה נמצאת בבדיקת עורך" });
+  if (article.status === "Published") article.status = "Draft";
+  service.applyValues(article, req.body);
+  await article.save();
+  res.json({ article });
 };
-
-// Delete an article (CRUD: Delete)
-exports.deleteArticle = async (req, res) => {
-    try {
-        // Extract the article ID from the URL parameters
-        const articleId = req.params.id;
-
-        // Find the article by ID and delete it from the database
-        const deletedArticle = await Article.findByIdAndDelete(articleId);
-
-        // If no article matches the given ID
-        if (!deletedArticle) {
-            return res.status(404).json({ message: 'Article not found' });
-        }
-
-        res.status(200).json({
-            message: 'Article deleted successfully',
-            deletedArticleId: deletedArticle._id
-        });
-    } catch (error) {
-        logger.logError('Error deleting article', error);
-
-        res.status(500).json({ 
-            message: 'Error deleting article', 
-            error: error.message 
-        });
-    }
-};
-
-// Approve and publish an article (Editor action)
 exports.publishArticle = async (req, res) => {
-    try {
-        const articleId = req.params.id;
-        const article = await Article.findById(articleId);
-
-        if (!article) {
-            return res.status(404).json({ message: 'Article not found' });
-        }
-
-        // Copy the current working draft into the publishedVersion object
-        article.publishedVersion = {
-            title: article.title,
-            category: article.category,
-            mainImage: article.mainImage,
-            content: article.content,
-            publishedAt: new Date()
-        };
-        
-        // Update the status to 'Published'
-        article.status = 'Published';
-        
-        const savedArticle = await article.save();
-
-        res.status(200).json({
-            message: 'Article published successfully',
-            article: savedArticle
-        });
-    } catch (error) {
-        logger.logError('Error publishing article', error);
-
-        res.status(500).json({ 
-            message: 'Error publishing article', 
-            error: error.message 
-        });
-    }
+  const article = await Article.findById(req.params.id);
+  if (!article) return res.status(404).json({ message: "כתבה לא נמצאה" });
+  res.json({ article: await service.publish(article) });
 };
-
-// Get only published articles for the public homepage (Guests) with Pagination
-exports.getPublicArticles = async (req, res) => {
-    try {
-        // קליטת מספר העמוד והכמות מתוך ה-Query Parameters (ברירת מחדל: עמוד 1, 5 כתבות בעמוד)
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 5;
-        const skip = (page - 1) * limit;
-
-        // שליפת הכתבות המפורסמות עם מדלג (skip) ומגבלה (limit)
-        const articles = await Article.find(PUBLIC_FILTER)
-            .populate('reporter', 'username')
-            .sort({ 'publishedVersion.publishedAt': -1 }) // מהחדש ישן
-            .skip(skip)
-            .limit(limit);
-
-        // ספירת סך הכל הכתבות המפורסמות לצורך בקרה
-        const totalArticles = await Article.countDocuments(PUBLIC_FILTER);
-
-        res.status(200).json({
-            message: 'Public articles fetched successfully',
-            count: articles.length,
-            total: totalArticles,
-            currentPage: page,
-            totalPages: Math.ceil(totalArticles / limit),
-            articles: articles.map(toPublicArticle)
-        });
-    } catch (error) {
-        logger.logError('Error fetching public articles', error);
-        
-        res.status(500).json({ 
-            message: 'Error fetching public articles', 
-            error: error.message 
-        });
-    }
+exports.deleteArticle = async (req, res) => {
+  await service.remove(req.params.id);
+  res.json({ ok: true });
 };
+exports.getPublicArticles = async (req, res) =>
+  res.json(await service.listPublic(req.query, req.deviceId));
