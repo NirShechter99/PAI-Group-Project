@@ -649,3 +649,67 @@ test("image uploads enforce ownership, CSRF, type and size; published snapshots 
     await require("../services/articles").remove(article._id);
   }
 });
+
+test("category validation rejects inherited object keys without saving an invalid draft", async () => {
+  await RateLimit.deleteMany({ _id: /^login:/ });
+  const reporter = await new Client().login("Reporter1");
+  const beforeCount = await Article.countDocuments();
+  for (const category of ["constructor", "toString", "__proto__", "not-a-category"]) {
+    const result = await reporter.request("/api/articles/create", "POST", { title: "Invalid category", category });
+    assert.equal(result.status, 400, `Category ${category} must be rejected`);
+  }
+  assert.equal(await Article.countDocuments(), beforeCount);
+});
+
+test("tampered JWTs cannot grant editor access and DB role/deletion changes apply immediately", async () => {
+  await RateLimit.deleteMany({ _id: /^login:/ });
+  const reporter = await new Client().login("Reporter1");
+  const original = reporter.cookies.token;
+  const parts = original.split(".");
+  const claims = JSON.parse(Buffer.from(parts[1], "base64url"));
+  parts[1] = Buffer.from(JSON.stringify({ ...claims, role: "Editor" })).toString("base64url");
+  reporter.cookies.token = parts.join(".");
+  assert.equal((await reporter.request("/api/users")).status, 401);
+  reporter.cookies.token = original;
+  assert.equal((await reporter.request("/api/users")).status, 403);
+  const username = "RoleProbe" + randomBytes(4).toString("hex");
+  const user = await User.create({ username, role: "Reporter", password: await require("bcrypt").hash(password, 10) });
+  try {
+    const client = await new Client().login(username);
+    assert.equal((await client.request("/api/articles/all")).status, 200);
+    await User.updateOne({ _id: user._id }, { role: "Guest" });
+    assert.equal((await client.request("/api/articles/all")).status, 403);
+    await User.deleteOne({ _id: user._id });
+    assert.equal((await client.request("/api/articles/all")).status, 401);
+  } finally { await User.deleteOne({ _id: user._id }); }
+});
+
+test("public article HTML and SEO metadata escape stored markup", async () => {
+  const owner = await User.findOne({ username: "Reporter1" });
+  const payload = '</title><script>window.injected=true</script><img src=x onerror="alert(1)">';
+  const article = await Article.create({ reporter: owner._id, status: "Published", title: payload, content: payload, category: "Technology", mainImage: "/images/news.svg", publishedVersion: { title: payload, content: payload, category: "Technology", mainImage: "/images/news.svg", publishedAt: new Date() } });
+  try {
+    const guest = new Client();
+    const response = await guest.request(`/api/articles/view/${article._id}`);
+    assert.equal(response.status, 200);
+    assert.ok(!response.text.includes(payload));
+    assert.ok(!response.text.includes("<script>window.injected=true</script>"));
+    assert.ok(response.text.includes("&lt;script&gt;window.injected=true&lt;/script&gt;"));
+    assert.ok(response.text.includes('property="og:title"'));
+  } finally { await require("../services/articles").remove(article._id); }
+});
+
+test("comment limits separate browsers and expire after the rolling window", async () => {
+  const article = await Article.findOne({ status: "Published" });
+  const first = new Client(), second = new Client();
+  await first.request("/"); await second.request("/");
+  const body = { article: String(article._id), content: "Rate limit probe" };
+  for(let i=0;i<3;i++) assert.equal((await first.request("/api/comments/create", "POST", body)).status, 201);
+  assert.equal((await first.request("/api/comments/create", "POST", body)).status, 429);
+  assert.equal((await second.request("/api/comments/create", "POST", body)).status, 201);
+  const encoded = decodeURIComponent(first.cookies.deviceId);
+  const deviceId = encoded.slice(2, encoded.lastIndexOf("."));
+  const old = new Date(Date.now() - 61000);
+  await RateLimit.updateOne({ _id: `comments:${deviceId}` }, { $set: { hits: [old,old,old] } });
+  assert.equal((await first.request("/api/comments/create", "POST", body)).status, 201);
+});
