@@ -30,4 +30,4 @@ Screenshots are generated to `docs/screenshots/` and ignored by Git. They can be
 
 ## Git delivery
 
-The branch includes the actual merged editor work in main at `ff35eda2c242f1358d9307965b4a049eeca2c35e`. Publishing was attempted through the connected GitHub integration; creating a branch returned HTTP 403, `Resource not accessible by integration`. Therefore the handoff contains the complete source and a bundle of the new finishing commits for the user to push with their own Git account. No remote branch or PR was created by this run.
+The branch is based on the actual merged editor work in main at `ff35eda2c242f1358d9307965b4a049eeca2c35e`. Direct publishing to the group repository returned HTTP 403. After the user created the fork `yuvalg2001/PAI-Group-Project`, feature-branch creation succeeded there. Finishing commits are published on `feature/ui-weather-docs` in that fork for review and integration into the group repository. The group main remains unchanged until the pull request is merged.
