@@ -43,5 +43,67 @@ exports.deleteArticle = async (req, res) => {
   await service.remove(req.params.id);
   res.json({ ok: true });
 };
-exports.getPublicArticles = async (req, res) =>
-  res.json(await service.listPublic(req.query, req.deviceId));
+
+// Get only published articles for the public homepage with search, filter, sort, and pagination
+exports.getPublicArticles = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 5;
+        const skip = (page - 1) * limit;
+
+        // מתחילים עם הפילטר הקבוצתי המוגדר מראש (Published)
+        let query = { ...PUBLIC_FILTER };
+
+        // 1. חיפוש טקסטואלי (כותרת או תוכן)
+        if (req.query.search) {
+            const searchRegex = new RegExp(req.query.search, 'i');
+            query.$or = [
+                { title: searchRegex },
+                { content: searchRegex },
+                { 'publishedVersion.title': searchRegex },
+                { 'publishedVersion.content': searchRegex }
+            ];
+        }
+
+        // 2. סינון לפי קטגוריה
+        if (req.query.category && req.query.category !== 'all') {
+            query.$or = [
+                { category: req.query.category },
+                { 'publishedVersion.category': req.query.category }
+            ];
+        }
+
+        // 3. הגדרת מיון (Sort)
+        let sortOption = { 'publishedVersion.publishedAt': -1 }; // ברירת מחדל: חדש לישן
+        if (req.query.sort === 'oldest') {
+            sortOption = { 'publishedVersion.publishedAt': 1 };
+        } else if (req.query.sort === 'popular') {
+            sortOption = { views: -1 };
+        }
+
+        // שליפת הכתבות מהמסד לפי כל התנאים
+        const articles = await Article.find(query)
+            .populate('reporter', 'username')
+            .sort(sortOption)
+            .skip(skip)
+            .limit(limit);
+
+        const totalArticles = await Article.countDocuments(query);
+
+        res.status(200).json({
+            message: 'Public articles fetched successfully',
+            count: articles.length,
+            total: totalArticles,
+            currentPage: page,
+            totalPages: Math.ceil(totalArticles / limit),
+            articles: articles.map(toPublicArticle)
+        });
+    } catch (error) {
+        logger.logError('Error fetching public articles with filters', error);
+        
+        res.status(500).json({ 
+            message: 'Error fetching public articles', 
+            error: error.message 
+        });
+    }
+};
