@@ -15,8 +15,8 @@
   <meta property="article:published_time" content="<%= new Date(article.publishedAt).toISOString() %>">
   <% } %>
   <title><%= title %> | The Daily Web</title>
-  <link rel="stylesheet" href="/css/site.css">
-  <script src="/js/site.js" defer></script>
+  <link rel="stylesheet" href="<%= asset('/css/site.css') %>">
+  <script src="<%= asset('/js/site.js') %>" defer></script>
 </head>
 
 <body>

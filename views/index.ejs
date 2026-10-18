@@ -41,5 +41,5 @@
         <%= feed.currentPage>=feed.totalPages ? 'hidden' : '' %>>כתבות נוספות ↓</button></div>
   </section><%- include('partials/weather') %>
 </div>
-<script src="/js/feed.js" defer></script>
+<script src="<%= asset('/js/feed.js') %>" defer></script>
 <%- include('partials/bottom') %>
