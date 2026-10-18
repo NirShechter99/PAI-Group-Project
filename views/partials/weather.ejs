@@ -2,6 +2,12 @@
   <section class="weather-card" aria-labelledby="weather-heading">
     <div class="eyebrow">מחוץ למסך</div>
     <h2 id="weather-heading">מזג האוויר</h2>
+    <label for="weather-location">מיקום</label>
+    <select id="weather-location" class="weather-location">
+      <% Object.entries(weatherLocations).forEach(([id, location]) => { %>
+      <option value="<%= id %>"><%= location.city %></option>
+      <% }) %>
+    </select>
     <div id="weather" aria-live="polite">
       <p class="muted">טוען מזג אוויר…</p>
     </div>

@@ -713,3 +713,57 @@ test("comment limits separate browsers and expire after the rolling window", asy
   await RateLimit.updateOne({ _id: `comments:${deviceId}` }, { $set: { hits: [old,old,old] } });
   assert.equal((await first.request("/api/comments/create", "POST", body)).status, 201);
 });
+
+test("all four feed sort orders match approved snapshots, including filtered pagination", async () => {
+  const guest = new Client(); await guest.request("/");
+  for (const [sort, order] of [
+    ["latest", { "publishedVersion.publishedAt": -1, _id: -1 }],
+    ["oldest", { "publishedVersion.publishedAt": 1, _id: 1 }],
+    ["popular", { totalViews: -1, _id: -1 }],
+    ["leastViewed", { totalViews: 1, _id: 1 }],
+  ]) {
+    const filter = { ...require("../utils/publicArticle").PUBLIC_FILTER, "publishedVersion.category": "Technology" };
+    const expected = await Article.find(filter).sort(order).limit(40);
+    const first = await guest.request(`/api/articles/public?category=Technology&sort=${sort}`);
+    const second = await guest.request(`/api/articles/public?category=Technology&sort=${sort}&page=2`);
+    assert.equal(first.status, 200);
+    assert.deepEqual([...first.data.articles, ...second.data.articles].map(a=>a._id), expected.map(a=>String(a._id)), sort);
+    const html = await guest.request(`/?category=Technology&sort=${sort}`);
+    assert.equal(html.status, 200);
+    assert.match(html.text, new RegExp(`value="${sort}" selected`));
+    assert.match(html.text, /data-category="Technology" class="active" aria-current="page"/);
+    assert.ok(!html.text.includes('class="nav-home active"'));
+  }
+  for (const query of ["location=constructor", "location=unsupported", "location=haifa&location=jerusalem"])
+    assert.equal((await guest.request(`/api/weather/current?${query}`)).status, 400);
+});
+
+test("security requirements: guest boundaries, reporter ownership and editor-only actions", async () => {
+  await RateLimit.deleteMany({ _id: /^login:/ });
+  const guest = new Client(); await guest.request("/login");
+  for (const path of ["/api/users", "/api/articles/all", "/api/analytics/article/000000000000000000000001"])
+    assert.equal((await guest.request(path)).status, 401, path);
+  for (const path of ["/reporter/articles", "/editor/articles"])
+    assert.equal((await guest.request(path)).headers.get("location"), "/login");
+  const reporter = await new Client().login("Reporter1");
+  const other = await User.findOne({username: "Reporter2"});
+  const foreign = await Article.findOne({reporter: other._id});
+  const created = await reporter.request("/api/articles/create", "POST", { reporter: other._id, status: "Published", title: "Ownership probe", category: "Technology", mainImage: "/images/news.svg", content: "Test", publishedVersion: {title: "Injected"} });
+  assert.equal(created.status, 201);
+  const id = created.data.article._id;
+  try {
+    const stored = await Article.findById(id);
+    assert.equal(String(stored.reporter), (await User.findOne({username: "Reporter1"})).id);
+    assert.equal(stored.status, "Draft");
+    assert.ok(!stored.publishedVersion?.publishedAt);
+    for (const [path, method] of [
+      [`/api/articles/publish/${id}`, "PUT"], [`/api/articles/delete/${id}`, "DELETE"],
+      [`/editor/articles/${id}/approve`, "POST"], [`/editor/articles/${id}/return`, "POST"],
+      [`/editor/articles/${id}/save`, "POST"], [`/editor/articles/${id}/delete`, "POST"],
+      ["/api/users/create", "POST"], [`/api/analytics/article/${id}`, "GET"],
+    ]) assert.equal((await reporter.request(path, method, method === "GET" ? undefined : {})).status, 403, path);
+    for (const action of ["save", "autosave", "submit"])
+      assert.equal((await reporter.request(`/reporter/articles/${foreign._id}/${action}`, "POST", {title:"Denied"})).status, 404);
+    assert.equal((await guest.request(`/api/articles/view/${id}`)).status, 404);
+  } finally { await require("../services/articles").remove(id); }
+});

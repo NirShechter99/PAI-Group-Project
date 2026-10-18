@@ -10,6 +10,7 @@ process.env.JWT_SECRET = randomBytes(48).toString("hex");
 const { app } = require("../app");
 const { seedDatabase } = require("../scripts/seed");
 const Article = require("../models/Article");
+const { locations } = require("../services/weather");
 let db, server, browser;
 (async () => {
   db = await MongoMemoryServer.create({
@@ -30,11 +31,11 @@ let db, server, browser;
     viewport: { width: 1440, height: 1000 },
   });
   // Stable weather data for visual QA; live provider is checked separately.
-  await context.route("**/api/weather/current", (route) =>
+  await context.route("**/api/weather/current*", (route) =>
     route.fulfill({
       json: {
         data: {
-          city: "תל אביב",
+          city: locations[new URL(route.request().url()).searchParams.get("location") || "tel-aviv"].city,
           temperature: 25,
           code: 1,
           isDay: true,
@@ -84,7 +85,7 @@ let db, server, browser;
   );
   await page.goto(base);
   let weatherCalls = 0;
-  await page.route("**/api/weather/current", (route) => {
+  await page.route("**/api/weather/current*", (route) => {
     weatherCalls++;
     return weatherCalls === 1
       ? route.fulfill({
@@ -109,9 +110,53 @@ let db, server, browser;
     0,
     "expired temperatures are cleared during provider failure",
   );
-  await page.unroute("**/api/weather/current");
+  await page.unroute("**/api/weather/current*");
   await page.locator("#weather-retry").click();
   await page.locator(".temperature").waitFor();
+  // Weather location persists across pages and refreshes without a document navigation.
+  await page.locator("#weather-location").selectOption("jerusalem");
+  await page.waitForFunction(() => document.querySelector("#weather > strong")?.textContent === "ירושלים");
+  await page.reload();
+  assert.equal(await page.locator("#weather-location").inputValue(), "jerusalem");
+  await page.waitForFunction(() => document.querySelector("#weather > strong")?.textContent === "ירושלים");
+  // A late response for an abandoned city must never replace the new selection.
+  let cityRequested, releaseCity, cityDone;
+  const requested = new Promise(resolve => { cityRequested = resolve; });
+  const gateCity = new Promise(resolve => { releaseCity = resolve; });
+  const doneCity = new Promise(resolve => { cityDone = resolve; });
+  await page.route("**/api/weather/current?location=haifa", async route => {
+    cityRequested();
+    await gateCity;
+    await route.fulfill({ json: { data: { city: "חיפה", locationId: "haifa", temperature: 17, code: 0, isDay: true, observedAt: new Date().toISOString(), validUntil: new Date(Date.now()+600000).toISOString() } } }).catch(() => {});
+    cityDone();
+  });
+  await page.locator("#weather-location").selectOption("haifa");
+  await requested;
+  await page.locator("#weather-location").selectOption("jerusalem");
+  await page.waitForFunction(() => document.querySelector("#weather > strong")?.textContent === "ירושלים");
+  releaseCity();
+  await doneCity;
+  assert.equal(await page.locator("#weather > strong").textContent(), "ירושלים");
+  await page.unroute("**/api/weather/current?location=haifa");
+  await page.locator("#weather-location").selectOption("tel-aviv");
+  await page.waitForFunction(() => document.querySelector("#weather > strong")?.textContent === "תל אביב");
+  // Every navigation category and dropdown selection has exactly one active link.
+  for (const category of ["Technology", "Sports", "Politics", "Economy", "Entertainment", ""]) {
+    await page.locator(`.site-nav a[data-category="${category}"]`).click();
+    await page.waitForFunction(category => document.querySelector(".site-nav a.active")?.dataset.category === category, category);
+    assert.equal(await page.locator(".site-nav a.active").count(), 1);
+    assert.equal(await page.locator(".site-nav a.active").getAttribute("aria-current"), "page");
+    assert.equal(await page.locator("#category").inputValue(), category);
+  }
+  for (const sort of ["oldest", "leastViewed"]) {
+    const response = page.waitForResponse(r => r.url().includes(`sort=${sort}`) && r.url().includes("/api/articles/public?") && r.status()===200);
+    await page.locator("#sort").selectOption(sort);
+    await response;
+    await page.waitForFunction(sort => new URL(location.href).searchParams.get("sort") === sort, sort);
+    await page.reload();
+    assert.equal(await page.locator("#sort").inputValue(), sort);
+  }
+  await page.locator("#sort").selectOption("latest");
   await page.locator("#search").fill("הטכנולוגיה");
   await page.waitForResponse(
     (r) => r.url().includes("/api/articles/public?") && r.status() === 200,
@@ -125,6 +170,7 @@ let db, server, browser;
   await page.waitForResponse(
     (r) => r.url().includes("category=Technology") && r.status() === 200,
   );
+  await page.waitForFunction(() => document.querySelector('.site-nav a.active')?.dataset.category === "Technology");
   await page.locator("#search").fill("אין-כותרת-כזאת");
   await page.waitForFunction(
     () => document.querySelectorAll(".news-card").length === 0,

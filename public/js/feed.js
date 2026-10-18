@@ -10,6 +10,15 @@
     Economy: "כלכלה",
     Entertainment: "תרבות",
   };
+  const categoryLinks = document.querySelectorAll(".site-nav a[data-category]");
+  function highlightCategory() {
+    categoryLinks.forEach((link) => {
+      const selected = link.dataset.category === form.elements.category.value;
+      link.classList.toggle("active", selected);
+      if (selected) link.setAttribute("aria-current", "page");
+      else link.removeAttribute("aria-current");
+    });
+  }
   let page = Number(more.dataset.page),
     pages = Number(more.dataset.pages),
     busy = false,
@@ -69,6 +78,7 @@
         signal: controller.signal,
       });
       if (request !== serial) return;
+      highlightCategory();
       if (reset) container.replaceChildren();
       container.append(...data.articles.map(card));
       page = data.currentPage;
@@ -99,6 +109,16 @@
     clearTimeout(timer);
     load(true);
   });
+  categoryLinks.forEach((link) => link.addEventListener("click", (event) => {
+    if (event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    clearTimeout(timer);
+    form.elements.q.value = "";
+    form.elements.category.value = link.dataset.category;
+    form.elements.viewed.value = "";
+    form.elements.sort.value = "latest";
+    load(true);
+  }));
   form
     .querySelectorAll("select")
     .forEach((el) => el.addEventListener("change", () => load(true)));

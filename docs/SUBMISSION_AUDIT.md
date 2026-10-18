@@ -1,10 +1,10 @@
-# Final submission audit — 17 October 2026
+# Final submission audit — updated 18 October 2026
 
 ## Verdict
 
 The audited application passes the functional checks below after the fixes in this branch. Submission readiness still depends on the team completing the manual items at the end. No statement here certifies the team's actual laptop/database, credential rotation, course registration or Moodle submission.
 
-Latest validation base: group `main` at `38549eb5cc2a64502781c8e35211961cac56eae4`, which merged PR #7 and repairs PR #4. A clean npm ci and the original 16 tests passed. Expanded checks reproduced one category-validation defect: inherited object keys such as constructor were accepted as categories. The final validation branch fixes this with an own-property check and adds four regression tests; all 20 tests pass. Merge that small fix and demonstrate the same final revision you submit.
+Latest feature validation base: group `main` at `1112d2030be79d68c0d1a86175e98e7c4dc5a11f` (PR #8). This branch adds selectable weather locations, active category navigation, oldest/least-viewed sorting, and the requested [security review](SECURITY_REVIEW.md). All 24 automated tests and the expanded browser workflows pass. Merge this feature branch and submit/demonstrate that same final revision.
 
 ## Post-PR #4 integration repairs
 
@@ -66,7 +66,7 @@ Latest validation base: group `main` at `38549eb5cc2a64502781c8e35211961cac56eae
 ## Final check results
 
 - JavaScript syntax checks passed.
-- **20/20 automated tests passed**, including complete CRUD, negative permissions, actual Node restart, stale autosaves and demo preflight.
+- **24/24 automated tests passed**, including complete CRUD, negative permissions, actual Node restart, stale autosaves and demo preflight.
 - Chromium workflow and all eight page types passed at 1440px, 768px and 390px; no page overflow or uncaught page exceptions.
 - An actual refresh during a delayed autosave recovered the newest keystrokes; a separate browser context loaded the same server-persisted draft.
 - Infinite scroll loaded a second batch; the weather UI removed expired data during a simulated outage and recovered after retry.
@@ -82,7 +82,7 @@ The browser checks cover Chromium, not every browser/device. The size/concurrenc
 ## Team actions tonight — חובה לפני הגשה
 
 1. **Check Moodle immediately.** The PDF mentions both submission up to 24 hours before the defense and closure at 23:59 on the preceding day. Confirm the actual course deadline and submit tonight as applicable; do not assume you can submit tomorrow.
-2. **Merge the final category-validation fix and freeze the final revision.** PR #7 already repaired the PR #4 integration. The latest validation branch contains one additional runtime validation fix and four regression tests. Generate the submission ZIP from the final merged source and demonstrate that same code.
+2. **Merge the requested weather/navigation/sorting feature branch and freeze the final revision.** PR #7 and PR #8 already include the earlier integration and category-validation repairs. Generate the submission ZIP from the final merged source and demonstrate that same code.
 3. **Run on the presentation computer:** `npm ci`, copy .env.example to .env, configure your own MONGO_URI/JWT_SECRET/DEMO_PASSWORD, start MongoDB, seed an empty demo DB, then `npm run preflight`, `npm run check`, `npm test`, `npm start`. Never run `seed -- --reset` on data you intend to keep.
 4. **Confirm the output of preflight on your real database.** This audit cannot inspect your local or Atlas demonstration data. Prepare MainEditor and Reporter1 accounts, a draft, a pending article, a returned article and a published article with several updates.
 5. **Rotate historical credentials.** Current files are clean, but earlier Git commits exposed a MongoDB password, JWT key and weather key. Their owners must revoke/replace them. Git history was not rewritten and credential rotation cannot be verified here.
