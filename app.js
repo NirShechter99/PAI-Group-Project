@@ -8,6 +8,7 @@ const auth = require("./middleware/authMiddleware");
 const { security } = require("./middleware/requestSecurity");
 const articles = require("./services/articles");
 const app = express();
+app.locals.asset = require("./utils/assets");
 app.disable("x-powered-by");
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));

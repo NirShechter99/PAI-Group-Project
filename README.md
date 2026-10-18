@@ -110,6 +110,7 @@ The cache is per city and server process, bounded to the eight supported cities.
 - **No articles:** run the seed command on your own empty demo database.
 - **Weather unavailable:** verify outbound HTTPS to `api.open-meteo.com`; wait for the cooldown. News, editing and login still work.
 - **403 after reopening an old form:** refresh the page to obtain a current CSRF token.
+- **Updating the project / controls still behave like an older version:** stop Node with Ctrl+C, install the complete updated source while preserving `.env` and `public/uploads`, then run `npm start` from that folder. CSS and JavaScript URLs include a hash of their contents so a new release bypasses older browser cache entries. No database reset is required.
 - **Tests cannot start MongoDB:** ensure binaries can download and execute on your machine. The tests disable Unix sockets on Unix platforms and connect over TCP, which also works in containers that restrict socket files. On PowerShell, set environment variables with `$env:NAME='value'` before running tests.
 
 The PDF authentication/security/permissions review, with code and test evidence, is in [docs/SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md).

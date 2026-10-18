@@ -27,6 +27,7 @@ let db, server, browser;
     executablePath:
       process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined,
   });
+  await require("./browser-cache-check")(browser, app);
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
   });
