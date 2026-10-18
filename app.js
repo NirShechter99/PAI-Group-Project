@@ -31,6 +31,9 @@ app.use((req, res, next) => {
   res.set("Cache-Control", "no-store"); // HTML includes a visitor-specific CSRF token.
   res.locals.currentUser = null;
   res.locals.categories = articles.categories;
+  res.locals.isFeedPage = req.path === "/";
+  res.locals.feedCategory = Object.hasOwn(articles.categories, req.query.category) ? req.query.category : "";
+  res.locals.weatherLocations = require("./services/weather").locations;
   res.locals.STATUS_LABELS = articles.statuses;
   res.locals.date = (value) =>
     value

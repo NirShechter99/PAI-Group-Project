@@ -42,14 +42,14 @@ Image uploads: reporters can upload PNG, JPEG or WebP files up to 3 MB from thei
 
 | Area | Implementation |
 | --- | --- |
-| Public feed `/` | 20 articles per batch; infinite scroll and a manual load button; Ajax title search, category/read-status filters and date/popularity sorting. Only approved snapshots are returned. |
+| Public feed `/` | 20 articles per batch; infinite scroll and a manual load button; Ajax title search, category/read-status filters and newest/oldest/most-viewed/least-viewed sorting; active category navigation. Only approved snapshots are returned. |
 | Article `/api/articles/view/:id` | Full article text rendered in initial HTML for SEO; author, category, date and image; each visit increments hourly analytics and records read status for the browser. |
 | Comments | Ajax creation without reloading the list; paged existing comments; server-enforced rolling limit of three submissions per browser per minute, plus client feedback. |
 | Reporter `/reporter/articles` | Own articles only; creation, draft editing, autosave, submission, editorial notes and published-update workflow. |
 | Editor `/editor/articles` | All articles with status filters and pagination; side-by-side approved and working versions; edit working content in every state, approve pending submissions, return with notes, delete and inspect analytics. |
 | Analytics | Hourly views on a numeric time axis; every publication has an exact timestamp marker; accessible source table and publication timeline. |
 | Authentication | bcrypt passwords, HTTP-only JWT cookie, current roles loaded from MongoDB, CSRF protection, login throttling and logout revocation. A normal restart does not invalidate sessions. |
-| Weather | Open-Meteo current conditions for Tel Aviv; server-side caching, concurrent-request sharing, timeout, retry cooldown, source attribution and client expiry. |
+| Weather | Open-Meteo current conditions for eight selectable Israeli cities; browser remembers the choice; independent server caches, concurrent-request sharing, timeout, retry cooldown, attribution and client expiry. |
 | Responsive design | Shared EJS partials; semantic layout, keyboard focus, labeled inputs, Hebrew RTL, mobile/tablet/desktop CSS. Wide management tables scroll inside their container. |
 
 ## Project structure
@@ -97,11 +97,11 @@ Public article visits record views automatically on the server. Client code does
 
 ## Weather design and limitations
 
-The public endpoint remains `GET /api/weather/current`. Open-Meteo's noncommercial free API requires no key or credit card; attribution appears in the widget. See [Open-Meteo](https://open-meteo.com/) and its [terms](https://open-meteo.com/en/terms).
+The public endpoint is `GET /api/weather/current?location=jerusalem` (optional location; default `tel-aviv`). The sidebar supports Tel Aviv, Jerusalem, Haifa, Beer Sheva, Eilat, Tiberias, Nazareth and Ashdod. The selection is remembered in this browser; changes update without a page reload. Unknown locations return 400 and never contact the provider. Open-Meteo's noncommercial free API requires no key or credit card; attribution appears in the widget. See [Open-Meteo](https://open-meteo.com/) and its [terms](https://open-meteo.com/en/terms).
 
-One successful provider response is shared by all visitors to a Node process for at most ten minutes, and never beyond **15 minutes after the provider's data timestamp**. The widget clears expired values even if the page stays open. Overlapping cache misses share one promise; upstream requests time out after five seconds. Failed requests have a 30-second cooldown. Stale or malformed data produces an unavailable state, never a misleading old temperature. Conditions are model-derived, not a guarantee of a live station observation.
+For each selected city, one successful provider response is shared by all visitors to a Node process for at most ten minutes, and never beyond **15 minutes after the provider's data timestamp**. The widget clears expired values even if the page stays open. Overlapping cache misses share one promise; upstream requests time out after five seconds. Failed requests have a 30-second cooldown. Stale or malformed data produces an unavailable state, never a misleading old temperature. Conditions are model-derived, not a guarantee of a live station observation.
 
-The cache is per server process. Multiple replicas need a shared cache to avoid one upstream request per replica; the current setup is a single Node server. At steady state this reduces thousands of visitor requests to a small number of provider calls. This is an architectural reduction, not a claim that a production load test has been performed.
+The cache is per city and server process, bounded to the eight supported cities. Each city has its own in-flight request and cooldown; switching cities cannot show an older response for a different city. Multiple replicas need a shared cache to avoid one upstream request per replica; the current setup is a single Node server. At steady state this reduces thousands of visitor requests to a small number of provider calls. This is an architectural reduction, not a claim that a production load test has been performed.
 
 ## Troubleshooting
 
@@ -111,6 +111,8 @@ The cache is per server process. Multiple replicas need a shared cache to avoid 
 - **Weather unavailable:** verify outbound HTTPS to `api.open-meteo.com`; wait for the cooldown. News, editing and login still work.
 - **403 after reopening an old form:** refresh the page to obtain a current CSRF token.
 - **Tests cannot start MongoDB:** ensure binaries can download and execute on your machine. The tests disable Unix sockets on Unix platforms and connect over TCP, which also works in containers that restrict socket files. On PowerShell, set environment variables with `$env:NAME='value'` before running tests.
+
+The PDF authentication/security/permissions review, with code and test evidence, is in [docs/SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md).
 
 ## Team and defense
 

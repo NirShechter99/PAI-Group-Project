@@ -37,9 +37,9 @@
     </div>
     <nav class="site-nav" aria-label="ניווט ראשי">
       <div class="wrap nav-inner">
-        <a href="/" class="nav-home">העדכונים האחרונים</a>
+        <a href="/" data-category="" class="nav-home<%= isFeedPage && !feedCategory ? ' active' : '' %>" <%- isFeedPage && !feedCategory ? 'aria-current="page"' : '' %>>העדכונים האחרונים</a>
         <% Object.entries(categories).forEach(([value,label]) => { %><a
-          href="/?category=<%= value %>"><%= label %></a><% }) %>
+          href="/?category=<%= value %>" data-category="<%= value %>" class="<%= isFeedPage && feedCategory===value ? 'active' : '' %>" <%- isFeedPage && feedCategory===value ? 'aria-current="page"' : '' %>><%= label %></a><% }) %>
         <% if (currentUser?.role === 'Reporter') { %><a href="/reporter/articles" class="staff-link">סביבת
           הכתב</a><% } %>
         <% if (currentUser?.role === 'Editor') { %><a href="/editor/articles" class="staff-link">מערכת העריכה</a><% } %>

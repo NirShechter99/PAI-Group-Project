@@ -22,8 +22,10 @@
           <option value="read" <%= filters.viewed==='read' ? 'selected' : '' %>>כבר קראתי</option>
         </select></div>
       <div><label for="sort">מיון</label><select name="sort" id="sort">
-          <option value="latest">החדש ביותר</option>
+          <option value="latest" <%= filters.sort==='latest' ? 'selected' : '' %>>החדש ביותר</option>
+          <option value="oldest" <%= filters.sort==='oldest' ? 'selected' : '' %>>הישן ביותר</option>
           <option value="popular" <%= filters.sort==='popular' ? 'selected' : '' %>>הנקרא ביותר</option>
+          <option value="leastViewed" <%= filters.sort==='leastViewed' ? 'selected' : '' %>>הכי פחות נצפה</option>
         </select></div>
       <button class="button" type="submit">חיפוש</button>
     </form>

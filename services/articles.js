@@ -78,10 +78,13 @@ async function listPublic(query, deviceId) {
   const readIds = await ReadingHistory.distinct("article", { deviceId });
   if (query.viewed === "read") filter._id = { $in: readIds };
   if (query.viewed === "unread") filter._id = { $nin: readIds };
-  const sort =
-    query.sort === "popular"
-      ? { totalViews: -1, _id: -1 }
-      : { "publishedVersion.publishedAt": -1, _id: -1 };
+  const sorts = {
+    latest: { "publishedVersion.publishedAt": -1, _id: -1 },
+    oldest: { "publishedVersion.publishedAt": 1, _id: 1 },
+    popular: { totalViews: -1, _id: -1 },
+    leastViewed: { totalViews: 1, _id: 1 },
+  };
+  const sort = Object.hasOwn(sorts, query.sort) ? sorts[query.sort] : sorts.latest;
   const [items, total] = await Promise.all([
     Article.find(filter)
       .populate("reporter", "username")

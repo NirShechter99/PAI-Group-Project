@@ -163,11 +163,12 @@ h3 {
   font-size: 0.86rem;
   padding-block: 14px;
 }
-.site-nav .nav-home {
+.site-nav a.active {
   font-weight: bold;
   color: var(--red);
   border-bottom: 3px solid var(--red);
 }
+.weather-location { margin-block: 6px 14px; width: 100%; }
 .staff-link {
   margin-inline-start: auto;
   font-weight: bold;
