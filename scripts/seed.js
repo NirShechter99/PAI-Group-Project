@@ -6,6 +6,7 @@ const Comment = require("../models/Comment");
 const Analytics = require("../models/Analytics");
 const ReadingHistory = require("../models/ReadingHistory");
 const RateLimit = require("../models/RateLimit");
+
 // Deliberately deterministic content: the defense can repeat the same scenarios.
 async function seedDatabase(password, { reset = false, count = 500 } = {}) {
   if (
@@ -53,6 +54,15 @@ async function seedDatabase(password, { reset = false, count = 500 } = {}) {
     "Economy",
     "Entertainment",
   ];
+
+  const categoryImages = {
+    Technology: "/images/Technology.jpg",
+    Sports: "/images/Sports.jpg",
+    Politics: "/images/Politics.jpg",
+    Economy: "/images/Economy.jpg",
+    Entertainment: "/images/Entertainment.jpg",
+  };
+
   const titles = [
     "הטכנולוגיה שמשנה את הדרך שבה אנחנו חיים",
     "הדור הבא של הספורט הישראלי",
@@ -76,12 +86,15 @@ async function seedDatabase(password, { reset = false, count = 500 } = {}) {
       status = ["Published", "Pending", "Draft", "Returned"][i % 4];
     const title = `${titles[i % 5]} · ${i + 1}`;
     const content = `${introductions[i % 5]}\n\nבמערכת The Daily Web אנחנו מחפשים את הסיפורים שמוסיפים הקשר לחדשות. בשבוע האחרון פגשנו אנשי מקצוע, תושבים ויוצרים כדי לשמוע מהם מה השתנה ומה כדאי לדעת.\n\nהסיפור הזה הוא תוכן הדגמה לפרויקט אקדמי. הנתונים והדמויות נועדו להמחיש את חוויית הקריאה ואת תהליך העבודה של מערכת חדשות.\n\nבהמשך הדרך נמשיך לעקוב אחר ההתפתחויות, לשאול שאלות ולתת מקום לקולות נוספים.`;
+    
+    const imageForCategory = categoryImages[category] || "/images/news.svg";
+
     const doc = {
       _id: new mongoose.Types.ObjectId(),
       title,
       content,
       category,
-      mainImage: "/images/news.svg",
+      mainImage: imageForCategory,
       reporter: users[1 + (i % 5)]._id,
       status,
       editorNote:
