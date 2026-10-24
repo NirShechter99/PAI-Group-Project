@@ -32,10 +32,10 @@ function applyValues(article, body) {
   if (
     article.mainImage &&
     !/^https:\/\//i.test(article.mainImage) &&
-    article.mainImage !== "/images/news.svg" &&
+    !/^\/images\/[a-zA-Z0-9_.-]+\.(png|jpg|jpeg|webp|svg)$/i.test(article.mainImage) &&
     !/^\/uploads\/[a-f0-9]{32}\.(png|jpg|webp)$/.test(article.mainImage)
   )
-    throw Object.assign(new Error("Image must use HTTPS"), { status: 400 });
+    throw Object.assign(new Error("Image path not allowed"), { status: 400 });
 }
 async function publish(article) {
   if (article.status !== "Pending")

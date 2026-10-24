@@ -45,7 +45,11 @@ app.use((req, res, next) => {
         })
       : "—";
   res.locals.safeImage = (value) =>
-    typeof value === "string" && (/^https:\/\//i.test(value) || /^\/uploads\/[a-f0-9]{32}\.(png|jpg|webp)$/.test(value))
+    typeof value === "string" && (
+      /^https:\/\//i.test(value) || 
+      /^\/uploads\/[a-f0-9]{32}\.(png|jpg|webp)$/.test(value) ||
+      /^\/images\/[a-zA-Z0-9_.-]+\.(png|jpg|jpeg|webp|svg)$/i.test(value)
+    )
       ? value
       : "/images/news.svg";
   next();
