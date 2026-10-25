@@ -4,7 +4,8 @@ A Hebrew, RTL news application for the Internet Applications course. Node.js + E
 
 ## Quick start
 
-Prerequisites: Node.js **22 or newer**, npm, and a running MongoDB instance (local MongoDB Community Server or your own Atlas database). Internet access is needed for weather. The news application remains usable if weather is unavailable.
+Prerequisites: Node.js **22 or newer**, npm, and a running MongoDB instance (local MongoDB Community Server or your own Atlas database).
+The news application remains usable if weather is unavailable.
 
 ```sh
 git clone https://github.com/NirShechter99/PAI-Group-Project.git
